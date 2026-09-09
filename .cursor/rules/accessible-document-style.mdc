@@ -1,0 +1,29 @@
+---
+description: Style for accessible textbook files destined for Grade 2 braille translation.
+globs: accessible/**/*.md
+alwaysApply: false
+---
+
+# Accessible Document Style
+
+Write plain prose for later Grade 2 braille. Do not use `*` `(` `)` `&` `#`.
+
+## Headings and lists
+BAD: `# Adjectives` or `**Tip:**` or `* identify adjectives` or `- identify adjectives`
+GOOD: a title-case or all-caps heading that matches the book, then body text
+GOOD: `• identify adjectives`
+GOOD: numbered practice `1.` `2.` `3.`
+GOOD: `Tip:` `Note:` `FYI:` `Directions:` `Examples` `Caption:`
+Keep `Note` on its own line when the book prints it that way.
+
+## Symbols
+BAD: `Adjectives & Articles` or `Grade 2 (UEB)` or `#1` or `*(required)*`
+GOOD: `Adjectives and Articles`
+GOOD: square-bracket asides: `[Themselves reflects winners.]`
+GOOD: a section break as `---`
+Write "and" not `&`. Avoid parentheses; rephrase or use square brackets.
+
+## Content
+Transcribe only what the book says. Possessive apostrophes, hyphens, dashes, and quotation marks are allowed.
+
+After writing, search the file for `*` `(` `)` `&` `#` and rephrase any hit unless the symbol is truly unavoidable in a math or code example.

@@ -1,0 +1,26 @@
+---
+description: Prep scanned textbook pages as accessible text for later Grade 2 braille. Never translate to braille.
+alwaysApply: true
+---
+
+# Accessible Textbook Prep for Grade 2 Braille
+
+Mission: turn scanned textbook pages into clean accessible text. Do not output Grade 2 braille, contractions, or braille ASCII.
+
+## Batch and files
+- One accessible file per 5-8 source pages. Never dump a whole chapter into one file.
+- Drop scans in `scans/` as images, PDF, or OCR text. Prefer `page-001.png` style names, or keep PDF page order.
+- Write output to `accessible/` as `pages-NNN-NNN.md` using zero-padded source pages, for example `pages-001-007.md`.
+- If the unit title is known, prefix it: `adjectives_pages-001-007.md`.
+- Convert the earliest unused pages. Do not invent pages. Chat style samples are not source scans.
+
+## OCR cleanup
+- Strip running headers, footers, and lone page numbers.
+- Rejoin line-break hyphens: `mod-` plus next-line `ify` becomes `modify`. Keep real hyphens such as `Joyner-Kersee`.
+- Read columns in order. Keep figure text as `Caption:` plus the caption. Drop ornaments and OCR garbage.
+- If a word is unreadable, write `[unclear]` rather than guessing a word that would change the lesson.
+
+## Structure
+Keep titles, Tip/Note/FYI lines, example blocks, directions, and numbered practice items. Transcribe faithfully.
+
+When a new quirk appears, add a BAD vs GOOD line to `.cursor/rules/accessible-document-style.mdc` in the same change.
