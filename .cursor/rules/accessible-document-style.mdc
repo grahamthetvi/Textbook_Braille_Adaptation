@@ -6,24 +6,47 @@ alwaysApply: false
 
 # Accessible Document Style
 
-Write plain prose for later Grade 2 braille. Do not use `*` `(` `)` `&` `#`.
+Write plain prose for later Grade 2 braille. Transcribe faithfully — do not change lesson content.
 
-## Headings and lists
-BAD: `# Adjectives` or `**Tip:**` or `* identify adjectives` or `- identify adjectives`
+## Paragraphs and headings
+Preserve the book's intended paragraphs. Do not merge unrelated blocks or split one thought across files.
+
+Apply titles with heading levels that match the book's hierarchy.
+
+BAD: `# Adjectives` or `## Tip` when the book uses a plain label
 GOOD: a title-case or all-caps heading that matches the book, then body text
-GOOD: `• identify adjectives`
-GOOD: numbered practice `1.` `2.` `3.`
-GOOD: `Tip:` `Note:` `FYI:` `Directions:` `Examples` `Caption:`
-Keep `Note` on its own line when the book prints it that way.
+GOOD: `Tip:` `Note:` `FYI:` `Directions:` `Examples` `Caption:` on their own lines when the book prints them that way
 
-## Symbols
-BAD: `Adjectives & Articles` or `Grade 2 (UEB)` or `#1` or `*(required)*`
+## Numbers, dates, and phones
+BAD: `1000 students` when the book shows a multi-digit quantity meant for reading aloud
+GOOD: `1,000 students` when comma grouping aids comprehension
+BAD: `March 4 2026` or `(555) 123-4567`
+GOOD: `March-4-2026` or `555-123-4567` using `-` as the separator
+
+## Lists and tables
+Tables, numbered lists, lettered lists, and bullet points are allowed.
+
+BAD: nested numbered lists (`1.` under `2.`)
+BAD: nested lettered lists (`a.` under `b.`)
+GOOD: flatten nested practice — renumber or reletter at one level only
+GOOD: `• identify adjectives` or `1.` `2.` `3.` at a single level
+GOOD: simple markdown tables when the book shows tabular data
+
+## Transcriber notes
+Use a separate paragraph to describe something visual on the page when it cannot be converted accessibly.
+
+BAD: `[Photo of a dog]` when the caption already says `Caption: A golden retriever sits in grass.`
+GOOD: convert the caption and skip the note when no extra value remains
+GOOD: `Transcriber note: A color photograph shows three bar graphs without numeric labels.` when the lesson depends on unseen layout
+
+## Symbols to avoid
+Avoid `[]`, `#`, `&`, and `*` unless those characters appear explicitly in the source text.
+
+BAD: `Adjectives & Articles` or `#1` or `*(required)*` or `**Tip:**`
 GOOD: `Adjectives and Articles`
-GOOD: square-bracket asides: `[Themselves reflects winners.]`
+GOOD: write "and" not `&`
 GOOD: a section break as `---`
-Write "and" not `&`. Avoid parentheses; rephrase or use square brackets.
 
-## Content
-Transcribe only what the book says. Possessive apostrophes, hyphens, dashes, and quotation marks are allowed.
+Possessive apostrophes, hyphens, dashes, and quotation marks are allowed when the book uses them.
 
-After writing, search the file for `*` `(` `)` `&` `#` and rephrase any hit unless the symbol is truly unavoidable in a math or code example.
+After writing, search the file for `[]`, `#`, `&`, and `*` and rephrase any hit unless the symbol is truly in the source.

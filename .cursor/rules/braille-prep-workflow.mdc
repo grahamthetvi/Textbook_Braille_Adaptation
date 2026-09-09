@@ -7,12 +7,23 @@ alwaysApply: true
 
 Mission: turn scanned textbook pages into clean accessible text. Do not output Grade 2 braille, contractions, or braille ASCII.
 
+## Agentic workflow
+1. User drops PDFs or page images in `scans/`.
+2. Agent or automation checks `scans/` for unprocessed files.
+3. Run `python3 scripts/run_pipeline.py` (or `--dry-run` first) to split PDFs and interpret batches.
+4. Review output in `accessible/`; edit only for OCR cleanup and style — not lesson content.
+5. Mark source files done by leaving matching outputs in `accessible/` (pipeline skips completed ranges).
+
 ## Batch and files
-- One accessible file per 5-8 source pages. Never dump a whole chapter into one file.
-- Drop scans in `scans/` as images, PDF, or OCR text. Prefer `page-001.png` style names, or keep PDF page order.
+- Split each PDF into batches of 5-8 internal pages for the whole document.
 - Write output to `accessible/` as `pages-NNN-NNN.md` using zero-padded source pages, for example `pages-001-007.md`.
 - If the unit title is known, prefix it: `adjectives_pages-001-007.md`.
 - Convert the earliest unused pages. Do not invent pages. Chat style samples are not source scans.
+
+## OCR and interpretation
+- Default model: `gemini-3.8-flash` with `thinking_level=high` via `scripts/run_pipeline.py`.
+- Set `GEMINI_API_KEY` or `GOOGLE_API_KEY` before running live interpretation.
+- Pricing note: Gemini 3.8 Flash is the cost-effective default through Dec 31, 2026; verify current rates before large jobs.
 
 ## OCR cleanup
 - Strip running headers, footers, and lone page numbers.
