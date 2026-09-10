@@ -1,0 +1,17 @@
+{
+  "completed": {
+    "Grammar Workbook.pdf:1-5": {
+      "source_pdf": "Grammar Workbook.pdf",
+      "start_page": 1,
+      "end_page": 5,
+      "output_file": "accessible/pages-001-005.md",
+      "completed_at": "2026-09-10T00:38:24.685712+00:00"
+    }
+  },
+  "sources": {
+    "Grammar Workbook.pdf": {
+      "sha256": "c052f402c10d555c36d9ea01b0546a417131227b280d229543c5cf1bd69cb550",
+      "updated_at": "2026-09-10T00:52:05.540942+00:00"
+    }
+  }
+}

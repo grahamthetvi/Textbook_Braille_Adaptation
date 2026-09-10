@@ -1,6 +1,5 @@
 # Generated pipeline artifacts
 scans/.batches/
-scans/.pipeline-state.json
 
 # Local env
 .env

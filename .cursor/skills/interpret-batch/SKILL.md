@@ -10,7 +10,7 @@ Interpretation runs inside Cursor via a **subagent** with a Gemini model. No `GE
 ## When to use
 
 - `python3 scripts/run_pipeline.py --status` shows pending batches
-- User asks to process scans, interpret batches, or continue the pipeline
+- User asks to process scans, transcribe batches, or continue the pipeline
 - After `python3 scripts/run_pipeline.py` splits new PDFs
 
 ## Orchestrator workflow
@@ -18,18 +18,24 @@ Interpretation runs inside Cursor via a **subagent** with a Gemini model. No `GE
 1. Split and inspect:
    ```bash
    python3 scripts/run_pipeline.py --json
-   python3 scripts/run_pipeline.py --manifest
+   python3 scripts/run_pipeline.py --manifest --max-batches 3
    ```
-2. Process pending batches **one at a time** (or `--max-batches N` at the orchestrator level — not a script flag).
+2. Process pending batches **one at a time** (or up to 3 per orchestrator turn via `--max-batches`).
 3. After each batch, or after a batch group, sync state:
    ```bash
    python3 scripts/run_pipeline.py --sync-state
    ```
-4. Re-run `--status` before large jobs; spot-check the first output against `.cursor/rules/accessible-document-style.mdc`.
+4. Validate output:
+   ```bash
+   python3 scripts/validate_accessible.py <output-path>
+   ```
+5. Re-run `--status` before large jobs; spot-check the first output against `.cursor/rules/accessible-document-style.mdc`.
+
+See `.cursor/skills/orchestrate-pipeline/SKILL.md` for the full loop.
 
 ## Launch one interpretation subagent
 
-Use the **Task** tool with model `gemini-3.8-flash-high` (or the closest available Gemini flash model with high thinking).
+Use the **Task** tool with model `gemini-3.8-flash-high` (or `DEFAULT_SUBAGENT_MODEL` from `scripts/config.py`).
 
 Pass a prompt like:
 
@@ -47,16 +53,19 @@ Requirements:
 - Output markdown only — no preamble or explanation.
 - Write the file to accessible/ with the exact filename above.
 - Do not change lesson content; use [unclear] for unreadable words.
-- After writing, confirm the output path.
+- After writing, run: python3 scripts/validate_accessible.py <output-path>
+- Fix any validation errors before finishing.
 ```
 
 Replace paths and page range from the manifest entry (`batch_pdf`, `output_path`, `start_page`, `end_page`).
 
 ## Resume semantics
 
-- Completed ranges are skipped when output exists or `scans/.pipeline-state.json` records them.
-- Re-run `run_pipeline.py` to re-split; existing accessible files are not overwritten automatically.
-- To redo a batch: delete its `accessible/*.md` entry and remove its key from `.pipeline-state.json`, then re-run.
+- Completed ranges are skipped when the output file exists in `accessible/`.
+- `scans/.pipeline-state.json` tracks completed batches and is committed to the repo.
+- Stale state entries (file deleted) are ignored automatically.
+- To redo a batch: `python3 scripts/run_pipeline.py --redo pages-001-005`
+- To clear state only: `python3 scripts/run_pipeline.py --reset-batch pages-001-005`
 
 ## Do not
 

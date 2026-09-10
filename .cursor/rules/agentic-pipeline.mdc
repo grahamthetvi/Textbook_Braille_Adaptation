@@ -12,7 +12,7 @@ alwaysApply: true
 ## Environment
 - Repository bootstrap: `.cursor/environment.json` runs `pip install -r scripts/requirements.txt` on agent start.
 - **No API key required.** Interpretation uses Cursor subagents with a Gemini model (`gemini-3.8-flash-high` or equivalent), not direct `google-genai` calls.
-- Skill: `.cursor/skills/interpret-batch/SKILL.md` — follow it for each pending batch.
+- Skills: `.cursor/skills/orchestrate-pipeline/SKILL.md` (full loop), `.cursor/skills/interpret-batch/SKILL.md` (per batch).
 - Diagnostics: `cursor-cloud-get-events` for setup failures; `cursor-cloud-run-info` for run identity.
 
 ## Commands
@@ -20,11 +20,14 @@ alwaysApply: true
 pip install -r scripts/requirements.txt
 python3 scripts/run_pipeline.py --status          # progress only
 python3 scripts/run_pipeline.py --status --json   # machine-readable status
-python3 scripts/run_pipeline.py --manifest        # pending batches for subagents
+python3 scripts/run_pipeline.py --manifest        # pending batches only (JSON)
+python3 scripts/run_pipeline.py --max-batches 3   # limit pending work returned
 python3 scripts/run_pipeline.py --dry-run         # plan batches only
 python3 scripts/run_pipeline.py --json              # split PDFs + pending manifest
 python3 scripts/run_pipeline.py --sync-state      # update state after subagent output
+python3 scripts/run_pipeline.py --redo pages-001-005  # reprocess one batch
 python3 scripts/run_pipeline.py --file scans/example.pdf
+python3 scripts/validate_accessible.py accessible/pages-001-005.md
 ```
 
 ## Agent checklist
@@ -34,10 +37,10 @@ python3 scripts/run_pipeline.py --file scans/example.pdf
    - Input: batch PDF path from manifest (`scans/.batches/<stem>/batch-NNN-NNN.pdf`)
    - Output: `accessible/pages-NNN-NNN.md` (or `<unit>_pages-NNN-NNN.md`)
    - Prompt: use `INTERPRETATION_PROMPT` from `scripts/config.py` plus `.cursor/rules/accessible-document-style.mdc`
-4. After subagent writes output, run `--sync-state` and re-check `--status`.
-5. Process incrementally (`max 1–3 batches` per orchestrator turn on first runs); spot-check output before large jobs.
+4. After subagent writes output, run `--sync-state`, then `python3 scripts/validate_accessible.py` on the new file.
+5. Process incrementally (`--max-batches 3` per orchestrator turn on first runs); spot-check output before large jobs.
 6. Spot-check one output file against `accessible-document-style.mdc`.
-7. Commit new `accessible/*.md` separately from script changes when possible.
+7. Commit new `accessible/*.md` and `scans/.pipeline-state.json` separately from script changes when possible.
 8. Open a draft PR for accessible output; keep `scans/.pipeline-state.json` committed so reruns resume.
 
 ## Subagent prompt template
@@ -56,9 +59,11 @@ Write markdown only to the output file. No preamble.
 ```
 
 ## Resume and state
-- Pipeline state: `scans/.pipeline-state.json` tracks completed page ranges per source file.
-- Completed ranges are skipped automatically; deleting an `accessible/*.md` file does not reset state — edit state or re-run with a new output name.
-- Split batch PDFs live in `scans/.batches/<stem>/` (gitignored). Re-split happens when `run_pipeline.py` runs.
+- Pipeline state: `scans/.pipeline-state.json` is committed and tracks completed page ranges per source file (including `unit_prefix` in keys when used).
+- Completed ranges require the output file to exist; stale state entries are ignored automatically.
+- Use `--redo pages-001-005` to delete output and clear state, or `--reset-batch pages-001-005` to clear state only.
+- Source PDF sha256 is stored in state; status warns when the file changes.
+- Split batch PDFs live in `scans/.batches/<stem>/` (gitignored). Only pending ranges are re-split; existing batch PDFs are kept unless the source changed.
 
 ## Outputs
 - Split PDF chunks: `scans/.batches/<stem>/batch-001-007.pdf`
