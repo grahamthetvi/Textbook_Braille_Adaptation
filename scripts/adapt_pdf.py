@@ -179,21 +179,25 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Split {args.pdf.name} into {len(batches)} batches", flush=True)
     transcribed = 0
     skipped = 0
-    for batch in batches:
-        label = _page_range(batch.start_page, batch.end_page)
-        out_path = args.out_dir / f"{batch.output_stem}.md"
-        if args.skip_existing and out_path.exists():
-            print(f"Skipping {label} (already at {out_path})", flush=True)
-            skipped += 1
-            continue
-        if args.max_batches and transcribed >= args.max_batches:
-            print(f"Stopping after {transcribed} new batch(es) (--max-batches)")
-            break
-        print(f"Transcribing {label} ({batch.page_count} pages)...", flush=True)
-        text = transcribe_pdf_bytes(batch.batch_pdf.read_bytes(), label, args.key, args.model)
-        out_path.write_text(text.rstrip() + "\n", encoding="utf-8")
-        transcribed += 1
-        print(f"  wrote {out_path}", flush=True)
+    try:
+        for batch in batches:
+            label = _page_range(batch.start_page, batch.end_page)
+            out_path = args.out_dir / f"{batch.output_stem}.md"
+            if args.skip_existing and out_path.exists():
+                print(f"Skipping {label} (already at {out_path})", flush=True)
+                skipped += 1
+                continue
+            if args.max_batches and transcribed >= args.max_batches:
+                print(f"Stopping after {transcribed} new batch(es) (--max-batches)")
+                break
+            print(f"Transcribing {label} ({batch.page_count} pages)...", flush=True)
+            text = transcribe_pdf_bytes(batch.batch_pdf.read_bytes(), label, args.key, args.model)
+            out_path.write_text(text.rstrip() + "\n", encoding="utf-8")
+            transcribed += 1
+            print(f"  wrote {out_path}", flush=True)
+    except RuntimeError as err:
+        print(f"Adaptation stopped: {err}", file=sys.stderr)
+        return 1
     print(f"Done: {transcribed} new file(s), {skipped} skipped, in {args.out_dir}")
     return 0
 
