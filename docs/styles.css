@@ -1,0 +1,384 @@
+:root {
+  --paper: #f6f1e8;
+  --paper-shade: #ebe4d6;
+  --ink: #1b2740;
+  --ink-muted: #4d596f;
+  --accent: #0e5c57;
+  --accent-ink: #073e3b;
+  --accent-soft: rgba(14, 92, 87, 0.14);
+  --rule: #c9bda8;
+  --error: #7a2e2a;
+  --error-soft: #f3e4dc;
+  --focus: #0e5c57;
+  --max: 52rem;
+  --serif: "Iowan Old Style", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --sans: "Source Sans 3", "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(90deg, var(--accent) 0 0.55rem, transparent 0.55rem),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 1.7rem,
+      rgba(27, 39, 64, 0.035) 1.7rem 1.75rem
+    );
+  font-family: var(--sans);
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 10;
+  padding: 0.4rem 0.8rem;
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 0.75rem;
+}
+
+.site-header,
+main {
+  width: min(var(--max), calc(100% - 2.5rem));
+  margin-inline: auto;
+}
+
+.site-header {
+  padding: 2.4rem 0 0.5rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1,
+h2 {
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+h1 {
+  margin: 0 0 0.8rem;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+}
+
+h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+}
+
+.lede {
+  margin: 0 0 1.6rem;
+  max-width: 42rem;
+  color: var(--ink-muted);
+}
+
+.panel {
+  margin-bottom: 1.25rem;
+  padding: 1.15rem 1.2rem 1.25rem;
+  border: 1px solid var(--rule);
+  background: rgba(246, 241, 232, 0.88);
+}
+
+fieldset.panel {
+  min-inline-size: 0;
+}
+
+legend,
+summary {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  padding-inline: 0.25rem;
+}
+
+summary {
+  cursor: pointer;
+}
+
+.advanced {
+  padding-top: 0.85rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.field:last-child {
+  margin-bottom: 0;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.field-row .field {
+  flex: 1 1 14rem;
+  margin-bottom: 0;
+}
+
+.field-narrow {
+  flex: 0 1 10rem;
+}
+
+.checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+label {
+  font-weight: 600;
+}
+
+.hint,
+.file-meta,
+.progress-label {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--ink-muted);
+}
+
+.progress-label {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+input[type="password"],
+input[type="text"],
+input[type="number"],
+input[type="url"],
+input[type="file"],
+select,
+button {
+  font: inherit;
+}
+
+input[type="password"],
+input[type="text"],
+input[type="number"],
+input[type="url"],
+select {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--ink);
+  background: #fffdf8;
+  color: var(--ink);
+  border-radius: 2px;
+}
+
+.drop-zone {
+  padding: 1.2rem 1rem;
+  border: 2px dashed var(--rule);
+  background: var(--paper-shade);
+  text-align: center;
+}
+
+.drop-zone.is-dragover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.drop-lead {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.15rem;
+}
+
+.drop-or {
+  margin: 0.35rem 0 0.7rem;
+  color: var(--ink-muted);
+}
+
+.file-picker {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  text-align: left;
+}
+
+.file-picker-label {
+  font-weight: 600;
+}
+
+.file-meta {
+  margin-top: 0.85rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.2rem 0 1.4rem;
+}
+
+.downloads .actions {
+  margin-bottom: 0;
+}
+
+button {
+  padding: 0.5rem 0.95rem;
+  border-radius: 2px;
+  border: 1px solid var(--ink);
+  background: #fffdf8;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+button[type="submit"],
+#download-md-btn {
+  background: var(--accent);
+  border-color: var(--accent-ink);
+  color: var(--paper);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+#cancel-btn {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.alert {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--error);
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+progress {
+  display: block;
+  width: 100%;
+  height: 0.7rem;
+  margin-bottom: 1rem;
+  accent-color: var(--accent);
+}
+
+.batch-list,
+.error-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.batch-row,
+.error-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto auto;
+  gap: 0.6rem 1rem;
+  align-items: center;
+  padding: 0.45rem 0.15rem;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.95rem;
+}
+
+.batch-row[data-status="running"] {
+  background: var(--accent-soft);
+}
+
+.batch-row[data-status="done"] .batch-status {
+  color: var(--accent-ink);
+}
+
+.batch-row[data-status="error"] .batch-status,
+.error-item {
+  color: var(--error);
+}
+
+.error-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.error-item p {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 40rem) {
+  body {
+    background-image:
+      linear-gradient(90deg, var(--accent) 0 0.35rem, transparent 0.35rem),
+      repeating-linear-gradient(
+        180deg,
+        transparent 0 1.7rem,
+        rgba(27, 39, 64, 0.035) 1.7rem 1.75rem
+      );
+  }
+
+  .site-header,
+  main {
+    width: min(var(--max), calc(100% - 1.4rem));
+  }
+
+  .field-row,
+  .actions,
+  .batch-row,
+  .error-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .file-picker {
+    width: 100%;
+  }
+
+  input[type="file"] {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

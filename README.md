@@ -1,77 +1,77 @@
-# Textbook Braille Adaptation
+# Textbook Adapter
 
-Turn scanned textbook PDFs into accessible plain-text markdown for later Grade 2 braille translation. Drop PDFs in `scans/`, run the pipeline to split them into 5-8 page batches, and delegate each batch to a **Gemini Cursor worker** for transcription into `accessible/`. No API key is required.
+Turn scanned textbook PDFs into accessible markdown for later Grade 2 braille translation. This app transcribes pages; it does not produce braille.
 
-## Quick start
+The primary path is a static web app: paste a Gemini API key, drop a PDF, split it into 5–8 page batches in the browser, send each batch to Gemini, and download markdown.
+
+## Web app
+
+Run it locally (no GitHub Pages setup required):
+
+```bash
+python3 scripts/serve_adapter.py
+```
+
+Then open the printed URL (`http://127.0.0.1:8000`).
+
+After you merge to `main` and enable GitHub Pages, the same app is also at:
+
+https://grahamthetvi.github.io/Textbook_Braille_Adaptation/
+
+1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+2. Drop a PDF on the page.
+3. Plan batches (5–8 pages each).
+4. Adapt book.
+5. Download the markdown (single file or zip).
+
+The key stays in your browser session. It is sent only to Google, or to an optional proxy if you set one (for example `http://127.0.0.1:8000/api/gemini` when using the local server). The page vendors [pdf-lib](https://github.com/Hopding/pdf-lib) and [JSZip](https://github.com/Stuk/jszip) in `docs/vendor/`.
+
+### Enable GitHub Pages
+
+Repo **Settings → Pages → GitHub Actions**. Pushes to `main` deploy the `docs/` site.
+
+## CLI fallback
 
 ```bash
 pip install -r scripts/requirements.txt
+
+# Adapt a PDF without the browser (needs a Gemini API key)
+python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --out-dir accessible
+python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --skip-existing --max-batches 1
+
+# Split a PDF into 5–8 page batches
+python3 scripts/run_pipeline.py --file scans/file.pdf --dry-run
+python3 scripts/run_pipeline.py --file scans/file.pdf
+
+# Check accessible markdown style
+python3 scripts/validate_accessible.py accessible/pages-001-005.md
 ```
 
-Drop source PDFs in `scans/`, then ask a Cursor agent to process them — or run the planning tools yourself:
+`scripts/serve_adapter.py` also exposes `POST /api/gemini/models/<model>:generateContent` so the page can use a same-origin proxy instead of calling Google directly.
 
-```bash
-python3 scripts/run_pipeline.py --dry-run
-python3 scripts/run_pipeline.py --status
-python3 scripts/run_pipeline.py              # split into batch PDFs
-python3 scripts/run_pipeline.py --manifest --batches 4 --spawn-prompt
-```
+## Optional Cursor in-repo path
 
-Process one file:
-
-```bash
-python3 scripts/run_pipeline.py --file scans/unit-01.pdf --unit-prefix adjectives
-```
-
-## Workflow
-
-1. User drops PDFs in `scans/`.
-2. Agent checks `scans/` for unprocessed files (`run_pipeline.py --status`).
-3. `scripts/run_pipeline.py` splits each PDF into 5-8 page batches under `scans/.batches/`.
-4. For each pending batch, the orchestrating agent runs a **same-VM Gemini worker** (`gemini-3.8-flash-medium`) that reads the batch PDF and writes accessible markdown. On Cloud Agent, process **one batch at a time**.
-5. Output lands in `accessible/` as `pages-001-007.md` or `<unit>_pages-001-007.md`.
-6. Agent runs `--sync-state`, then reviews output against `.cursor/rules/`.
-
-See `.cursor/skills/interpret-batch/SKILL.md` for the worker prompt and checklist.
-
-## Repository layout
-
-| Path | Purpose |
-| --- | --- |
-| `scans/` | Incoming PDFs (PDF only for now) |
-| `scans/.batches/` | Generated batch PDFs (gitignored) |
-| `accessible/` | Accessible markdown output |
-| `scripts/` | Pipeline Python tools (split + status only) |
-| `.cursor/rules/` | Style and agent workflow rules |
-| `.cursor/skills/interpret-batch/` | How to run interpretation workers |
-| `.cursor/skills/orchestrate-pipeline/` | Full orchestration loop |
-
-## Running in Cursor Cloud Agents
-
-This repo includes `.cursor/environment.json` so Cloud Agents install Python dependencies automatically (`pypdf` only).
-
-### Drop a scan and ask the agent
-
-1. Upload or commit a PDF under `scans/` (for example `scans/Grammar Workbook.pdf`).
-2. Start a Cloud Agent and ask it to **process the scan** (optionally: "process 20 pages" or "next 4 batches").
-3. The agent runs `--manifest --spawn-prompt`, then processes batches **sequentially** on the same VM.
-4. Review commits for new files in `accessible/`.
-
-### Agent commands
+If you are already in Cursor and want workers to write `accessible/` without a Google API key, the older split-and-subagent tools still work:
 
 ```bash
 python3 scripts/run_pipeline.py --status --json
-python3 scripts/run_pipeline.py --manifest --batches 4 --spawn-prompt   # "process 4 batches"
-python3 scripts/run_pipeline.py --manifest --pages 20 --spawn-prompt    # "process 20 pages"
-python3 scripts/run_pipeline.py                                       # split PDFs
+python3 scripts/run_pipeline.py --manifest --batches 1 --spawn-prompt
+python3 scripts/run_pipeline.py
 python3 scripts/run_pipeline.py --sync-state
-python3 scripts/run_pipeline.py --redo pages-001-005
-python3 scripts/validate_accessible.py
 ```
 
-See `.cursor/rules/token-stewardship.mdc` for why this repo avoids direct Gemini API calls and parallel Cloud Agent Tasks.
+Prefer the web app or `adapt_pdf.py` for a full book. Cursor workers cannot read PDF pixels reliably, and parallel Cloud Agent Tasks cannot write back to this workspace. See `.cursor/rules/token-stewardship.mdc`.
 
-Pipeline state is tracked in `scans/.pipeline-state.json` so completed page ranges are skipped on reruns. See `.cursor/rules/agentic-pipeline.mdc` for the full agent checklist.
+## Layout
+
+| Path | Purpose |
+| --- | --- |
+| `docs/` | Static web app (GitHub Pages and local server) |
+| `scans/` | Source PDFs |
+| `accessible/` | Accessible markdown output |
+| `scripts/` | Local server, CLI adapt, split, validate, optional agent status |
+| `.cursor/rules/` | Accessible style and workflow rules |
+| `.cursor/skills/` | Agent skills for serving the adapter or optional in-repo batches |
 
 ## Style rules
 
@@ -85,6 +85,6 @@ Accessible files follow `.cursor/rules/accessible-document-style.mdc`:
 
 ## What you still need
 
-- **Sample PDFs**: add real textbook scans to `scans/` to validate end-to-end quality.
-- **Human review**: spot-check math, diagrams, and `[unclear]` markers before braille translation.
-- **CI optional**: add a dry-run or split-only check on PRs when sample fixtures exist.
+- A Gemini API key from Google AI Studio for the web app or CLI.
+- Human review of math, diagrams, and `[unclear]` markers before braille translation.
+- GitHub Pages enabled if you want the public site URL after merge.

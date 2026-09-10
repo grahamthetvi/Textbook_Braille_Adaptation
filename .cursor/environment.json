@@ -1,4 +1,17 @@
 {
   "name": "Textbook Braille Adaptation",
-  "install": "pip install -r scripts/requirements.txt"
+  "install": "pip install -r scripts/requirements.txt",
+  "terminals": [
+    {
+      "name": "adapter",
+      "command": "python3 scripts/serve_adapter.py --port 8000",
+      "description": "Textbook adapter web app at http://127.0.0.1:8000"
+    }
+  ],
+  "ports": [
+    {
+      "name": "Textbook adapter",
+      "port": 8000
+    }
+  ]
 }

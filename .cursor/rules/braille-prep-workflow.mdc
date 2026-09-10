@@ -7,13 +7,26 @@ alwaysApply: true
 
 Mission: turn scanned textbook pages into clean accessible text. Do not output Grade 2 braille, contractions, or braille ASCII.
 
-## Agentic workflow
-1. User drops PDFs in `scans/` (PDF only for now).
-2. Agent checks pending work with `python3 scripts/run_pipeline.py --status --json`.
-3. Run `python3 scripts/run_pipeline.py` (or `--dry-run` first) to split pending PDF ranges into batch PDFs.
-4. Launch interpretation workers to transcribe each pending batch (see `.cursor/skills/interpret-batch/SKILL.md`).
-5. Run `--sync-state`, validate with `python3 scripts/validate_accessible.py`, then review output in `accessible/`.
-6. Completed batches are tracked in `scans/.pipeline-state.json` (committed).
+## Default workflow (web app)
+
+1. Run `python3 scripts/serve_adapter.py` and open `http://127.0.0.1:8000` (or the GitHub Pages URL after deploy).
+2. The user pastes a Gemini API key (session only) and drops a textbook PDF.
+3. The browser splits the PDF into 5–8 page batches and sends each batch to Gemini.
+4. Download combined markdown or a zip of `pages-NNN-NNN.md` files into `accessible/` after review.
+5. Validate with `python3 scripts/validate_accessible.py` when files land in the repo.
+
+CLI equivalent: `python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --out-dir accessible`.
+
+## Optional Cursor in-repo path
+
+Only when the user asks to process `scans/` inside Cursor without the web app:
+
+1. Check pending work with `python3 scripts/run_pipeline.py --status --json`.
+2. Run `python3 scripts/run_pipeline.py` to split pending PDF ranges into batch PDFs.
+3. Launch interpretation workers one batch at a time (see `.cursor/skills/interpret-batch/SKILL.md`).
+4. Run `--sync-state`, validate, then review output in `accessible/`.
+
+Do not use Cursor workers as the default for a full book. They cannot reliably read scanned PDF pixels, and parallel Cloud Agent Tasks cannot write to this workspace.
 
 ## Batch and files
 - Split each PDF into batches of 5-8 internal pages for the whole document.
@@ -22,9 +35,8 @@ Mission: turn scanned textbook pages into clean accessible text. Do not output G
 - Convert the earliest unused pages. Do not invent pages. Chat style samples are not source scans.
 
 ## Transcription
-- Default: same-VM worker with `gemini-3.8-flash-medium` (see `.cursor/skills/interpret-batch/SKILL.md`). No API key.
-- Cap each turn with `--batches N` or `--pages N`; use `--spawn-prompt` for ready-made worker prompts.
-- On Cloud Agent: **one batch per turn**, sequential only (see `.cursor/rules/token-stewardship.mdc`).
+- **Default:** web adapter or `adapt_pdf.py` with the user's Gemini API key.
+- **Cursor fallback:** same-VM worker with `gemini-3.8-flash-medium`, one batch per turn on Cloud Agent.
 - Validate with `python3 scripts/validate_accessible.py`; spot-check the first batch on a new book.
 
 ## OCR cleanup

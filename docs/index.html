@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Textbook Adapter</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header class="site-header">
+      <p class="eyebrow">Accessible textbook prep</p>
+      <h1>Textbook Adapter</h1>
+      <p class="lede">
+        Drop a scanned textbook PDF, paste a Gemini API key, and download accessible
+        markdown for later Grade 2 braille. The key stays in this browser session and
+        is sent only to Google Gemini, or to an optional proxy you set.
+      </p>
+    </header>
+
+    <main id="main">
+      <form id="adapter-form" novalidate>
+        <fieldset class="panel">
+          <legend>Gemini access</legend>
+
+          <div class="field">
+            <label for="api-key">Gemini API key</label>
+            <input
+              id="api-key"
+              name="api-key"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              aria-describedby="api-key-hint"
+            />
+            <p id="api-key-hint" class="hint">
+              Required to adapt. Not written to disk. Session storage is used only if
+              you check the box below.
+            </p>
+          </div>
+
+          <div class="field checkbox-field">
+            <input id="remember-key" name="remember-key" type="checkbox" />
+            <label for="remember-key">Remember key this session</label>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="model">Model</label>
+              <select id="model" name="model"></select>
+            </div>
+            <div class="field" id="custom-model-wrap" hidden>
+              <label for="custom-model">Custom model</label>
+              <input
+                id="custom-model"
+                name="custom-model"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="gemini-2.5-flash"
+              />
+            </div>
+            <div class="field field-narrow">
+              <label for="batch-size">Preferred batch size</label>
+              <input
+                id="batch-size"
+                name="batch-size"
+                type="number"
+                min="5"
+                max="8"
+                value="6"
+                required
+              />
+            </div>
+          </div>
+        </fieldset>
+
+        <details class="panel advanced">
+          <summary>Advanced: optional proxy URL</summary>
+          <div class="field">
+            <label for="proxy-url">Proxy URL</label>
+            <input
+              id="proxy-url"
+              name="proxy-url"
+              type="url"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="http://127.0.0.1:8000/api/gemini"
+            />
+            <p class="hint">
+              Leave blank to call Google Gemini from this browser. Set a proxy if
+              this page cannot reach Google, using a host that forwards
+              generateContent.
+            </p>
+          </div>
+        </details>
+
+        <fieldset class="panel">
+          <legend>Textbook PDF</legend>
+          <div id="drop-zone" class="drop-zone">
+            <p class="drop-lead">Drop a textbook PDF here</p>
+            <p class="drop-or">or</p>
+            <label class="file-picker" for="pdf-file">
+              <span class="file-picker-label">PDF file</span>
+              <input id="pdf-file" name="pdf-file" type="file" accept="application/pdf" />
+            </label>
+            <p id="file-meta" class="file-meta">No file loaded.</p>
+          </div>
+        </fieldset>
+
+        <div class="actions">
+          <button id="plan-btn" type="button">Plan batches</button>
+          <button id="adapt-btn" type="submit">Adapt book</button>
+          <button id="cancel-btn" type="button" disabled>Cancel</button>
+        </div>
+      </form>
+
+      <p id="form-alert" class="alert" hidden role="alert"></p>
+
+      <section class="panel" aria-labelledby="progress-heading">
+        <h2 id="progress-heading">Progress</h2>
+        <p id="status" role="status" aria-live="polite">Load a PDF to plan batches. Gemini is not called until you adapt.</p>
+        <label class="progress-label" for="progress-bar">Batches completed</label>
+        <progress id="progress-bar" max="1" value="0"></progress>
+        <ul id="batch-list" class="batch-list" aria-label="Batch status"></ul>
+      </section>
+
+      <section id="error-section" class="panel" aria-labelledby="errors-heading" hidden>
+        <h2 id="errors-heading">Failed batches</h2>
+        <p class="hint">Each failed range can be retried without re-sending batches that already succeeded.</p>
+        <ul id="error-list" class="error-list"></ul>
+      </section>
+
+      <section class="panel downloads" aria-labelledby="download-heading">
+        <h2 id="download-heading">Download</h2>
+        <p class="hint">Downloads include completed batches only, even if some rows still need a retry.</p>
+        <div class="actions">
+          <button id="download-md-btn" type="button" disabled>Download combined markdown</button>
+          <button id="download-zip-btn" type="button" disabled>Download zip</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="vendor/pdf-lib.min.js"></script>
+    <script src="vendor/jszip.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
