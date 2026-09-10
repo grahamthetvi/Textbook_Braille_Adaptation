@@ -11,7 +11,7 @@ Mission: turn scanned textbook pages into clean accessible text. Do not output G
 1. User drops PDFs in `scans/` (PDF only for now).
 2. Agent checks pending work with `python3 scripts/run_pipeline.py --status --json`.
 3. Run `python3 scripts/run_pipeline.py` (or `--dry-run` first) to split pending PDF ranges into batch PDFs.
-4. Launch Cursor subagents to transcribe each pending batch (see `.cursor/skills/interpret-batch/SKILL.md`).
+4. Launch interpretation workers to transcribe each pending batch (see `.cursor/skills/interpret-batch/SKILL.md`).
 5. Run `--sync-state`, validate with `python3 scripts/validate_accessible.py`, then review output in `accessible/`.
 6. Completed batches are tracked in `scans/.pipeline-state.json` (committed).
 
@@ -22,9 +22,9 @@ Mission: turn scanned textbook pages into clean accessible text. Do not output G
 - Convert the earliest unused pages. Do not invent pages. Chat style samples are not source scans.
 
 ## Transcription
-- Default: **foreground** Cursor subagent with `gemini-3.8-flash-medium` (see `.cursor/skills/interpret-batch/SKILL.md`). No API key.
-- Cap each turn with `--batches N` or `--pages N`; use `--spawn-prompt` for ready-made Task prompts.
-- Max 3 interpretation subagents per orchestrator turn (see `.cursor/rules/token-stewardship.mdc`).
+- Default: same-VM worker with `gemini-3.8-flash-medium` (see `.cursor/skills/interpret-batch/SKILL.md`). No API key.
+- Cap each turn with `--batches N` or `--pages N`; use `--spawn-prompt` for ready-made worker prompts.
+- On Cloud Agent: **one batch per turn**, sequential only (see `.cursor/rules/token-stewardship.mdc`).
 - Validate with `python3 scripts/validate_accessible.py`; spot-check the first batch on a new book.
 
 ## OCR cleanup

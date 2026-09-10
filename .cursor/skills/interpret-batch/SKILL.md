@@ -1,11 +1,11 @@
 ---
 name: interpret-batch
-description: Transcribe one PDF batch into accessible markdown using a Gemini Cursor subagent. Use when run_pipeline reports pending batches.
+description: Transcribe one PDF batch into accessible markdown using a Gemini Cursor worker. Use when run_pipeline reports pending batches.
 ---
 
-# Interpret Batch (Gemini Subagent)
+# Interpret Batch (Gemini Worker)
 
-Interpretation runs inside Cursor via a **foreground subagent** with a Gemini model. No `GEMINI_API_KEY` is required.
+Interpretation runs inside Cursor via a **same-VM worker** with a Gemini model. No `GEMINI_API_KEY` is required.
 
 ## When to use
 
@@ -15,33 +15,33 @@ Interpretation runs inside Cursor via a **foreground subagent** with a Gemini mo
 
 ## Plan how much to process
 
-Map user requests to pipeline flags:
-
 | User says | Command |
 | --- | --- |
 | "process 4 batches" / "redo 4 md files" | `--manifest --batches 4 --spawn-prompt` |
 | "process 20 pages" | `--manifest --pages 20 --spawn-prompt` |
-| "continue the pipeline" | `--manifest --batches 3 --spawn-prompt` (default cap) |
+| "continue the pipeline" | `--manifest --batches 1 --spawn-prompt` on Cloud Agent |
 
 ```bash
 python3 scripts/run_pipeline.py --status --json
 python3 scripts/run_pipeline.py --manifest --batches 4 --spawn-prompt
 ```
 
-## Launch interpretation subagents
+## Launch one interpretation worker
 
-1. Read `spawn.tasks[]` from the manifest JSON.
-2. For each task (max 3 per turn), call the **Task** tool with:
-   - `model`: task `model` field (`gemini-3.8-flash-medium` by default)
-   - `run_in_background`: **false**
-   - `prompt`: task `prompt` field (already minimal)
-3. After all tasks finish:
+**Cloud Agent:** process **one batch at a time** on this VM. Do not spawn nested Task subagents.
+
+1. Read `spawn.tasks[0]` from the manifest (first pending batch only on Cloud Agent).
+2. Run as a same-VM worker with model from task `model` (`gemini-3.8-flash-medium`).
+3. Use task `prompt` — read batch PDF, write `accessible/*.md`, validate.
+4. After finishing:
    ```bash
    python3 scripts/run_pipeline.py --sync-state
-   python3 scripts/validate_accessible.py accessible/pages-*.md
+   python3 scripts/validate_accessible.py <output-path>
    ```
 
-See `.cursor/rules/token-stewardship.mdc` for why background or parallel fan-out is forbidden.
+**Desktop Cursor:** may process up to 3 batches per turn via foreground Task subagents (`launch_limit_per_turn` in manifest).
+
+See `.cursor/rules/token-stewardship.mdc` for why parallel Cloud Agent Tasks fail.
 
 ## Resume and redo
 
@@ -52,6 +52,6 @@ See `.cursor/rules/token-stewardship.mdc` for why background or parallel fan-out
 ## Do not
 
 - Call `google-genai` or require `GEMINI_API_KEY`.
-- Combine multiple batch PDFs in one subagent call.
-- Launch more than 3 interpretation subagents in one turn.
-- Use background subagents for interpretation.
+- Combine multiple batch PDFs in one worker call.
+- Launch parallel Task subagents on Cloud Agent.
+- Spawn nested Task subagents from an interpretation worker.

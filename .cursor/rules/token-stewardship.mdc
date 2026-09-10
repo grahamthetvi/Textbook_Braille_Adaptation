@@ -19,10 +19,11 @@ Interpretation uses **Cursor subagents** with a Gemini model. There is no `GEMIN
 
 1. Plan work with `--status --json` or `--manifest`.
 2. Cap each turn with `--batches N` or `--pages N` (for example `--batches 4` or `--pages 20`).
-3. Launch **foreground** Task subagents only (`run_in_background: false`), at most `MAX_SUBAGENTS_PER_TURN` (3) per turn.
-4. **One batch per subagent** — never combine multiple batch PDFs in one call.
-5. After subagents finish, run `--sync-state` and `validate_accessible.py` in the orchestrator (not inside every subagent) when possible.
-6. On a new book, process **one batch first**, spot-check, then continue.
+3. On **Cloud Agent**, process **one batch per turn** on the same VM — parallel Task subagents run on separate VMs and cannot write files here.
+4. On desktop Cursor, at most `MAX_SUBAGENTS_PER_TURN` (3) foreground Task subagents per turn.
+5. **One batch per worker** — never combine multiple batch PDFs in one call.
+6. After each batch, run `--sync-state` and `validate_accessible.py` in the orchestrator when possible.
+7. On a new book, process **one batch first**, spot-check, then continue.
 
 ## Do not
 

@@ -16,7 +16,9 @@ def build_subagent_prompt(batch: dict) -> str:
     page_range = page_range_label(start, end)
     brief = INTERPRETATION_PROMPT.format(page_range=page_range)
 
-    return f"""Transcribe this textbook batch into accessible markdown.
+    return f"""You are an interpretation worker on the shared Cloud Agent VM. Do not spawn Task subagents.
+
+Transcribe this textbook batch into accessible markdown.
 
 Batch PDF: {batch["batch_pdf"]}
 Output file: {batch["output_path"]}
@@ -28,7 +30,7 @@ Requirements:
 - Read only the batch PDF above. Do not render extra page images.
 - Write markdown only to the output file. No preamble or summary in chat.
 - Run: python3 scripts/validate_accessible.py {batch["output_path"]}
-- Fix validation errors, then commit the output file if requested.
+- Fix validation errors before finishing.
 """
 
 

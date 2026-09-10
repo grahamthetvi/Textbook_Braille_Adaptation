@@ -1,6 +1,6 @@
 # Textbook Braille Adaptation
 
-Turn scanned textbook PDFs into accessible plain-text markdown for later Grade 2 braille translation. Drop PDFs in `scans/`, run the pipeline to split them into 5-8 page batches, and delegate each batch to a **Gemini Cursor subagent** for transcription into `accessible/`. No API key is required.
+Turn scanned textbook PDFs into accessible plain-text markdown for later Grade 2 braille translation. Drop PDFs in `scans/`, run the pipeline to split them into 5-8 page batches, and delegate each batch to a **Gemini Cursor worker** for transcription into `accessible/`. No API key is required.
 
 ## Quick start
 
@@ -14,7 +14,7 @@ Drop source PDFs in `scans/`, then ask a Cursor agent to process them — or run
 python3 scripts/run_pipeline.py --dry-run
 python3 scripts/run_pipeline.py --status
 python3 scripts/run_pipeline.py              # split into batch PDFs
-python3 scripts/run_pipeline.py --manifest   # list pending batches (JSON)
+python3 scripts/run_pipeline.py --manifest --batches 4 --spawn-prompt
 ```
 
 Process one file:
@@ -28,11 +28,11 @@ python3 scripts/run_pipeline.py --file scans/unit-01.pdf --unit-prefix adjective
 1. User drops PDFs in `scans/`.
 2. Agent checks `scans/` for unprocessed files (`run_pipeline.py --status`).
 3. `scripts/run_pipeline.py` splits each PDF into 5-8 page batches under `scans/.batches/`.
-4. For each pending batch, the orchestrating agent launches a **foreground Cursor subagent** (model `gemini-3.8-flash-medium`) that reads the batch PDF and writes accessible markdown.
+4. For each pending batch, the orchestrating agent runs a **same-VM Gemini worker** (`gemini-3.8-flash-medium`) that reads the batch PDF and writes accessible markdown. On Cloud Agent, process **one batch at a time**.
 5. Output lands in `accessible/` as `pages-001-007.md` or `<unit>_pages-001-007.md`.
 6. Agent runs `--sync-state`, then reviews output against `.cursor/rules/`.
 
-See `.cursor/skills/interpret-batch/SKILL.md` for the subagent prompt and checklist.
+See `.cursor/skills/interpret-batch/SKILL.md` for the worker prompt and checklist.
 
 ## Repository layout
 
@@ -43,19 +43,19 @@ See `.cursor/skills/interpret-batch/SKILL.md` for the subagent prompt and checkl
 | `accessible/` | Accessible markdown output |
 | `scripts/` | Pipeline Python tools (split + status only) |
 | `.cursor/rules/` | Style and agent workflow rules |
-| `.cursor/skills/interpret-batch/` | How to run interpretation subagents |
+| `.cursor/skills/interpret-batch/` | How to run interpretation workers |
 | `.cursor/skills/orchestrate-pipeline/` | Full orchestration loop |
 
 ## Running in Cursor Cloud Agents
 
-This repo includes `.cursor/environment.json` so Cloud Agents install Python dependencies automatically (`pypdf` only). After merging environment changes, open the environment in Cursor and **Save** the proposed configuration when prompted.
+This repo includes `.cursor/environment.json` so Cloud Agents install Python dependencies automatically (`pypdf` only).
 
 ### Drop a scan and ask the agent
 
 1. Upload or commit a PDF under `scans/` (for example `scans/Grammar Workbook.pdf`).
-2. Start a Cloud Agent on this repo and ask it to **process the scan**.
-3. The agent should run `python3 scripts/run_pipeline.py --status --json`, split PDFs, then launch Gemini subagents for pending batches (often one batch first).
-4. Review the PR or commits for new files in `accessible/`.
+2. Start a Cloud Agent and ask it to **process the scan** (optionally: "process 20 pages" or "next 4 batches").
+3. The agent runs `--manifest --spawn-prompt`, then processes batches **sequentially** on the same VM.
+4. Review commits for new files in `accessible/`.
 
 ### Agent commands
 
@@ -69,7 +69,7 @@ python3 scripts/run_pipeline.py --redo pages-001-005
 python3 scripts/validate_accessible.py
 ```
 
-See `.cursor/rules/token-stewardship.mdc` for why this repo avoids direct Gemini API calls and caps subagents per turn.
+See `.cursor/rules/token-stewardship.mdc` for why this repo avoids direct Gemini API calls and parallel Cloud Agent Tasks.
 
 Pipeline state is tracked in `scans/.pipeline-state.json` so completed page ranges are skipped on reruns. See `.cursor/rules/agentic-pipeline.mdc` for the full agent checklist.
 
