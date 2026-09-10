@@ -23,6 +23,7 @@ Mission: turn scanned textbook pages into clean accessible text. Do not output G
 
 ## Transcription
 - Default: Cursor **subagent** with `gemini-3.8-flash-high` (see `.cursor/skills/interpret-batch/SKILL.md`). No API key required.
+- The orchestrator agent must never transcribe batches directly — always launch one Task subagent per pending batch.
 - `scripts/run_pipeline.py` splits PDFs and tracks state; the orchestrating agent launches one subagent per pending batch.
 - Validate each output with `python3 scripts/validate_accessible.py` before large jobs.
 - Spot-check the first batch before processing a new book at scale.

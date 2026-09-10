@@ -13,7 +13,7 @@
       "start_page": 6,
       "end_page": 10,
       "output_file": "accessible/pages-006-010.md",
-      "completed_at": "2026-09-10T00:58:48.828356+00:00"
+      "completed_at": "2026-09-10T01:25:06.937174+00:00"
     },
     "Grammar Workbook.pdf:11-15": {
       "source_pdf": "Grammar Workbook.pdf",
@@ -21,7 +21,7 @@
       "start_page": 11,
       "end_page": 15,
       "output_file": "accessible/pages-011-015.md",
-      "completed_at": "2026-09-10T00:58:48.828410+00:00"
+      "completed_at": "2026-09-10T01:25:06.937227+00:00"
     },
     "Grammar Workbook.pdf:16-20": {
       "source_pdf": "Grammar Workbook.pdf",
@@ -29,13 +29,13 @@
       "start_page": 16,
       "end_page": 20,
       "output_file": "accessible/pages-016-020.md",
-      "completed_at": "2026-09-10T00:58:48.828450+00:00"
+      "completed_at": "2026-09-10T01:25:06.937268+00:00"
     }
   },
   "sources": {
     "Grammar Workbook.pdf": {
       "sha256": "c052f402c10d555c36d9ea01b0546a417131227b280d229543c5cf1bd69cb550",
-      "updated_at": "2026-09-10T00:58:48.926950+00:00"
+      "updated_at": "2026-09-10T01:25:06.914436+00:00"
     }
   }
 }

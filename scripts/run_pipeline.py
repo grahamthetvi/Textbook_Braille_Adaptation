@@ -21,6 +21,13 @@ if str(SCRIPT_DIR) not in sys.path:
 from config import ACCESSIBLE_DIR, BATCHES_DIR, SCANS_DIR, STATE_FILE
 from split_pdf import PageBatch, describe_plan, source_sha256, split_pdf
 
+CLOUD_AGENT_NOTE = (
+    "Cloud Agent: process batches sequentially with same-VM interpretation workers "
+    "(gemini-3.8-flash-high). Do not launch parallel or nested Task subagents for "
+    "file-writing work — they run on separate VMs and cannot write to this "
+    "/workspace. See .cursor/skills/orchestrate-pipeline/SKILL.md § Cloud Agent."
+)
+
 
 def load_state() -> dict:
     if not STATE_FILE.exists():
@@ -291,6 +298,7 @@ def build_status(
 
     return {
         "interpretation_mode": "cursor_subagent",
+        "cloud_agent_note": CLOUD_AGENT_NOTE,
         "scans_dir": str(SCANS_DIR),
         "accessible_dir": str(ACCESSIBLE_DIR),
         "batches_dir": str(BATCHES_DIR),
@@ -316,6 +324,8 @@ def print_status(status: dict, *, as_json: bool, manifest: bool = False) -> None
                 "warnings": status.get("warnings", []),
                 "blockers": status.get("blockers", []),
             }
+        if status.get("interpretation_mode") == "cursor_subagent":
+            payload["cloud_agent_note"] = status.get("cloud_agent_note", CLOUD_AGENT_NOTE)
         print(json.dumps(payload, indent=2))
         return
 
@@ -328,6 +338,8 @@ def print_status(status: dict, *, as_json: bool, manifest: bool = False) -> None
         f"{status['pending_batches']} pending"
     )
     print(f"Interpretation mode: {status['interpretation_mode']} (no API key required)")
+    if status.get("interpretation_mode") == "cursor_subagent":
+        print(f"Cloud Agent: {status.get('cloud_agent_note', CLOUD_AGENT_NOTE)}")
     for warning in status.get("warnings", []):
         print(f"Warning: {warning}")
     for source in status["sources"]:
@@ -451,6 +463,7 @@ def run(
     save_state(state)
     summary = {
         "interpretation_mode": "cursor_subagent",
+        "cloud_agent_note": CLOUD_AGENT_NOTE,
         "planned": planned,
         "split": split_count,
         "skipped": skipped,
@@ -474,6 +487,7 @@ def run(
                 "(see .cursor/skills/interpret-batch/SKILL.md), then run "
                 "`python3 scripts/run_pipeline.py --sync-state`."
             )
+            print(f"Cloud Agent: {CLOUD_AGENT_NOTE}")
     return 0
 
 
