@@ -37,6 +37,7 @@ pip install -r scripts/requirements.txt
 
 # Adapt a PDF without the browser (needs a Gemini API key)
 python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --out-dir accessible
+python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --skip-existing --max-batches 1
 
 # Split a PDF into 5–8 page batches
 python3 scripts/run_pipeline.py --file scans/file.pdf --dry-run

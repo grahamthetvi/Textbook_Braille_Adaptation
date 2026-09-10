@@ -157,6 +157,7 @@ class AdapterHandler(SimpleHTTPRequestHandler):
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", default="127.0.0.1", help="Bind address (default 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default 8000)")
     return parser.parse_args(argv)
 
@@ -166,9 +167,9 @@ def main(argv: list[str] | None = None) -> int:
     if not DOCS_DIR.is_dir():
         print(f"docs directory not found: {DOCS_DIR}", file=sys.stderr)
         return 1
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), AdapterHandler)
-    print(f"Serving {DOCS_DIR} at http://127.0.0.1:{args.port}", flush=True)
-    print(f"Open http://127.0.0.1:{args.port}", flush=True)
+    server = ThreadingHTTPServer((args.host, args.port), AdapterHandler)
+    print(f"Serving {DOCS_DIR} at http://{args.host}:{args.port}", flush=True)
+    print(f"Open http://{args.host}:{args.port}", flush=True)
     print("Gemini proxy: POST /api/gemini/models/<model>:generateContent", flush=True)
     try:
         server.serve_forever()

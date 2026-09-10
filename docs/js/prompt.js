@@ -1,4 +1,6 @@
-/** Transcription prompt plus accessible-document-style rules sent to Gemini. */
+/** Transcription prompt plus accessible-document-style rules sent to Gemini.
+ * Keep STYLE_RULES in lockstep with scripts/adapt_pdf.py STYLE_REMINDER.
+ */
 
 export const STYLE_RULES = `Accessible Document Style
 

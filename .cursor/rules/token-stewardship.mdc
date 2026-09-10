@@ -1,33 +1,33 @@
 ---
-description: Limit Gemini token use for textbook transcription in Cursor.
+description: Limit Cursor token use. The web adapter uses the user's Gemini API key instead.
 alwaysApply: true
 ---
 
 # Token Stewardship
 
-Interpretation uses **Cursor subagents** with a Gemini model. There is no `GEMINI_API_KEY` in this workflow.
+The **primary adapter** is the static web app (or `scripts/adapt_pdf.py`). Those paths send batch PDFs to Gemini with the **user's API key**, billed to Google, not to Cursor.
 
-## What caused runaway token use
+Do not transcribe a full book with Cursor subagents unless the user asks for the in-repo path.
 
-1. **Direct `google-genai` calls** — uploading batch PDFs with `thinking_level=high` bills every page as multimodal input plus extended reasoning tokens. This repo no longer uses that path.
-2. **Parallel subagent fan-out** — launching 4+ background subagents at once multiplies context and vision cost. Failed runs still consume tokens.
-3. **Duplicate vision work** — rendering page PNGs in the orchestrator while subagents also read the batch PDF wastes tokens twice.
-4. **Over-powered models** — `gemini-3.8-flash-high` is for hard reasoning, not faithful OCR. Use `gemini-3.8-flash-medium` unless quality fails.
-5. **Verbose prompts** — pasting long rule sets into every subagent. Use `python3 scripts/run_pipeline.py --manifest --spawn-prompt` for the short prompt template in `scripts/spawn_prompt.py`.
+## What caused runaway Cursor token use
 
-## Required orchestrator behavior
+1. **Direct `google-genai` SDK calls from Cloud Agents** — uploading batch PDFs with `thinking_level=high` billed every page as multimodal input plus extended reasoning tokens.
+2. **Parallel subagent fan-out** — launching 4+ background subagents at once. Failed runs still consume tokens. Parallel Cloud Agent Tasks also cannot write to this workspace.
+3. **Duplicate vision work** — rendering page PNGs in the orchestrator while subagents also read the batch PDF.
+4. **Over-powered models** — `gemini-3.8-flash-high` is for hard reasoning, not faithful OCR.
+5. **Verbose prompts** pasted into every subagent.
 
-1. Plan work with `--status --json` or `--manifest`.
-2. Cap each turn with `--batches N` or `--pages N` (for example `--batches 4` or `--pages 20`).
-3. On **Cloud Agent**, process **one batch per turn** on the same VM — parallel Task subagents run on separate VMs and cannot write files here.
-4. On desktop Cursor, at most `MAX_SUBAGENTS_PER_TURN` (3) foreground Task subagents per turn.
-5. **One batch per worker** — never combine multiple batch PDFs in one call.
-6. After each batch, run `--sync-state` and `validate_accessible.py` in the orchestrator when possible.
-7. On a new book, process **one batch first**, spot-check, then continue.
+## If the user asks for Cursor in-repo transcription
+
+1. Cap each turn with `--batches 1` on Cloud Agent (or `--pages N` / `--batches N` on desktop).
+2. Process **one batch per turn** on the same VM.
+3. Use `gemini-3.8-flash-medium` unless quality fails.
+4. One batch per worker — never combine multiple batch PDFs in one call.
+5. After each batch, run `--sync-state` and `validate_accessible.py`.
 
 ## Do not
 
-- Call `google-genai`, `gemini_interpret.py`, or require `GEMINI_API_KEY`.
+- Use Cursor workers as the default adapter for a scanned book.
 - Spawn background interpretation subagents.
 - Render extra page images when the batch PDF is available.
 - Process an entire book in one agent turn.

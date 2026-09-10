@@ -22,15 +22,41 @@ from split_pdf import split_pdf
 
 DEFAULT_MODEL = "gemini-2.5-flash"
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
+# Keep in lockstep with docs/js/prompt.js STYLE_RULES.
 STYLE_REMINDER = """Accessible Document Style
-Transcribe faithfully. Do not change lesson content.
-Do not use markdown hash headings unless the book prints that character.
-Use Tip: Note: FYI: Directions: Examples Caption: on their own lines when printed.
-Comma-group multi-digit numbers. Dates and phones use hyphens.
-Do not nest numbered or lettered lists; flatten practice to one level.
-Avoid square brackets, number-sign, ampersand, and asterisk unless in the source.
-Write "and" not an ampersand. Use [unclear] for unreadable words.
-Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens.
+
+Write plain prose for later Grade 2 braille. Transcribe faithfully — do not change lesson content.
+
+Paragraphs and headings
+Preserve the book's intended paragraphs. Do not merge unrelated blocks or split one thought across files.
+Apply titles with heading levels that match the book's hierarchy.
+Do not use markdown hash headings such as a leading number-sign on a title unless the book itself prints that character.
+Use labels such as Tip: Note: FYI: Directions: Examples Caption: on their own lines when the book prints them that way.
+
+Numbers, dates, and phones
+Use comma grouping for multi-digit quantities when it aids comprehension, for example 1,000 students.
+Write dates and phone numbers with hyphen separators, for example March-4-2026 or 555-123-4567.
+
+Lists and tables
+Tables, numbered lists, lettered lists, and bullet points are allowed.
+Do not nest numbered lists. Do not nest lettered lists.
+Flatten nested practice — renumber or reletter at one level only.
+Use a bullet character or 1. 2. 3. at a single level.
+Use simple markdown tables when the book shows tabular data.
+
+Transcriber notes
+Use a separate paragraph to describe something visual on the page when it cannot be converted accessibly.
+If a caption already describes the image, convert the caption and skip an extra note.
+When the lesson depends on unseen layout, write: Transcriber note: followed by a short description.
+
+Symbols to avoid
+Avoid square brackets, the number-sign, ampersand, and asterisk unless those characters appear explicitly in the source text.
+Write "and" not an ampersand.
+Use a section break as three hyphens on its own line.
+Possessive apostrophes, hyphens, dashes, and quotation marks are allowed when the book uses them.
+
+Unreadable words
+Use the token [unclear] for a word that cannot be read. Do not guess a word that would change the lesson.
 """
 
 
@@ -125,6 +151,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--out-dir", type=Path, default=ACCESSIBLE_DIR)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--preferred", type=int, default=6, help="Preferred batch size (5-8)")
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip batches whose markdown already exists in --out-dir",
+    )
+    parser.add_argument(
+        "--max-batches",
+        type=int,
+        default=0,
+        help="Stop after N new transcriptions (0 means no limit)",
+    )
     return parser.parse_args(argv)
 
 
@@ -140,14 +177,24 @@ def main(argv: list[str] | None = None) -> int:
     args.out_dir.mkdir(parents=True, exist_ok=True)
     batches = split_pdf(args.pdf, preferred_batch_size=args.preferred)
     print(f"Split {args.pdf.name} into {len(batches)} batches", flush=True)
+    transcribed = 0
+    skipped = 0
     for batch in batches:
         label = _page_range(batch.start_page, batch.end_page)
+        out_path = args.out_dir / f"{batch.output_stem}.md"
+        if args.skip_existing and out_path.exists():
+            print(f"Skipping {label} (already at {out_path})", flush=True)
+            skipped += 1
+            continue
+        if args.max_batches and transcribed >= args.max_batches:
+            print(f"Stopping after {transcribed} new batch(es) (--max-batches)")
+            break
         print(f"Transcribing {label} ({batch.page_count} pages)...", flush=True)
         text = transcribe_pdf_bytes(batch.batch_pdf.read_bytes(), label, args.key, args.model)
-        out_path = args.out_dir / f"{batch.output_stem}.md"
         out_path.write_text(text.rstrip() + "\n", encoding="utf-8")
+        transcribed += 1
         print(f"  wrote {out_path}", flush=True)
-    print(f"Done: {len(batches)} file(s) in {args.out_dir}")
+    print(f"Done: {transcribed} new file(s), {skipped} skipped, in {args.out_dir}")
     return 0
 
 
