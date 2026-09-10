@@ -1,0 +1,32 @@
+---
+description: Limit Gemini token use for textbook transcription in Cursor.
+alwaysApply: true
+---
+
+# Token Stewardship
+
+Interpretation uses **Cursor subagents** with a Gemini model. There is no `GEMINI_API_KEY` in this workflow.
+
+## What caused runaway token use
+
+1. **Direct `google-genai` calls** — uploading batch PDFs with `thinking_level=high` bills every page as multimodal input plus extended reasoning tokens. This repo no longer uses that path.
+2. **Parallel subagent fan-out** — launching 4+ background subagents at once multiplies context and vision cost. Failed runs still consume tokens.
+3. **Duplicate vision work** — rendering page PNGs in the orchestrator while subagents also read the batch PDF wastes tokens twice.
+4. **Over-powered models** — `gemini-3.8-flash-high` is for hard reasoning, not faithful OCR. Use `gemini-3.8-flash-medium` unless quality fails.
+5. **Verbose prompts** — pasting long rule sets into every subagent. Use `python3 scripts/run_pipeline.py --manifest --spawn-prompt` for the short prompt template in `scripts/spawn_prompt.py`.
+
+## Required orchestrator behavior
+
+1. Plan work with `--status --json` or `--manifest`.
+2. Cap each turn with `--batches N` or `--pages N` (for example `--batches 4` or `--pages 20`).
+3. Launch **foreground** Task subagents only (`run_in_background: false`), at most `MAX_SUBAGENTS_PER_TURN` (3) per turn.
+4. **One batch per subagent** — never combine multiple batch PDFs in one call.
+5. After subagents finish, run `--sync-state` and `validate_accessible.py` in the orchestrator (not inside every subagent) when possible.
+6. On a new book, process **one batch first**, spot-check, then continue.
+
+## Do not
+
+- Call `google-genai`, `gemini_interpret.py`, or require `GEMINI_API_KEY`.
+- Spawn background interpretation subagents.
+- Render extra page images when the batch PDF is available.
+- Process an entire book in one agent turn.

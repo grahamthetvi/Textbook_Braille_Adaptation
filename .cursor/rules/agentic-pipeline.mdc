@@ -7,30 +7,42 @@ alwaysApply: true
 
 ## Trigger
 - New or updated files in `scans/` are the processing trigger.
-- On each run, list `scans/` and compare against `accessible/` output names before calling Gemini.
+- On each run, list `scans/` and compare against `accessible/` output names before interpreting batches.
+
+## Environment
+- Repository bootstrap: `.cursor/environment.json` runs `pip install -r scripts/requirements.txt` on agent start.
+- **No API key required.** Interpretation uses foreground Cursor subagents with `gemini-3.8-flash-medium` (see `DEFAULT_SUBAGENT_MODEL` in `scripts/config.py`). Do not call `google-genai`.
+- Skills: `.cursor/skills/orchestrate-pipeline/SKILL.md` (full loop), `.cursor/skills/interpret-batch/SKILL.md` (per batch).
+- Token limits: `.cursor/rules/token-stewardship.mdc`.
 
 ## Commands
 ```bash
 pip install -r scripts/requirements.txt
-export GEMINI_API_KEY="your-key"   # or GOOGLE_API_KEY
-python3 scripts/run_pipeline.py --dry-run   # plan batches only
-python3 scripts/run_pipeline.py             # split + interpret pending work
-python3 scripts/run_pipeline.py --file scans/example.pdf
+python3 scripts/run_pipeline.py --status --json
+python3 scripts/run_pipeline.py --manifest --batches 4 --spawn-prompt   # user: "process 4 batches"
+python3 scripts/run_pipeline.py --manifest --pages 20 --spawn-prompt  # user: "process 20 pages"
+python3 scripts/run_pipeline.py --dry-run
+python3 scripts/run_pipeline.py                                       # split pending batch PDFs
+python3 scripts/run_pipeline.py --sync-state
+python3 scripts/run_pipeline.py --redo pages-001-005
+python3 scripts/validate_accessible.py accessible/pages-001-005.md
 ```
 
 ## Agent checklist
-1. Confirm `scans/` has input and note filenames.
-2. Run `--dry-run` and report planned batch ranges.
-3. Run the pipeline when an API key is available; otherwise split PDFs and stop with a clear blocker message.
-4. Spot-check one output file against style rules in `accessible-document-style.mdc`.
-5. Commit new `accessible/*.md` separately from script changes when possible.
+1. Map the user request to `--batches N` or `--pages N`, then run `--manifest --spawn-prompt`.
+2. Run `python3 scripts/run_pipeline.py` to split any new pending batch PDFs.
+3. Launch **foreground** Task subagents from `spawn.tasks` (max 3 per turn, one batch each).
+4. Run `--sync-state` and `validate_accessible.py` after subagents finish.
+5. On a new book, start with one batch; spot-check before scaling up.
+6. Commit `accessible/*.md` and `scans/.pipeline-state.json` separately from script changes.
 
-## Outputs
-- Split PDF chunks: `scans/.batches/<stem>/batch-001-007.pdf`
-- Accessible markdown: `accessible/pages-001-007.md` or `accessible/<unit>_pages-001-007.md`
-- Pipeline state: `scans/.pipeline-state.json` tracks completed page ranges per source file
+## Resume and state
+- `scans/.pipeline-state.json` is committed; completed ranges require the output file to exist.
+- `--redo pages-001-005` deletes output and clears state for one batch.
+- Source PDF sha256 is tracked; status warns when the file changes.
 
 ## Do not
-- Translate to braille in this repo.
-- Process whole chapters in one Gemini call — keep batches at 5-8 pages.
-- Guess unreadable lesson words — use `[unclear]` per workflow rules.
+- Require `GEMINI_API_KEY` or call `gemini_interpret.py` / `google-genai`.
+- Launch background interpretation subagents or more than 3 per turn.
+- Process whole chapters in one subagent call.
+- Render extra page images when the batch PDF is available.
