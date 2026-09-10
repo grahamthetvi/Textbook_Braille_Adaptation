@@ -135,6 +135,10 @@ summary {
   margin-bottom: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .field-row {
   display: flex;
   flex-wrap: wrap;
