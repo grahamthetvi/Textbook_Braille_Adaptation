@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -15,11 +14,8 @@ MIN_PAGES_PER_BATCH = 5
 MAX_PAGES_PER_BATCH = 8
 DEFAULT_BATCH_SIZE = 6
 
-# Gemini 3.8 Flash with high thinking — cost-effective default through 2026-12-31.
-DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
-DEFAULT_THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "high")
-
-API_KEY_ENV_VARS = ("GEMINI_API_KEY", "GOOGLE_API_KEY")
+# Cursor subagent model for batch interpretation (no direct API key required).
+DEFAULT_SUBAGENT_MODEL = "gemini-3.8-flash-high"
 
 INTERPRETATION_PROMPT = """You are transcribing scanned textbook pages into accessible plain text for later Grade 2 braille translation.
 

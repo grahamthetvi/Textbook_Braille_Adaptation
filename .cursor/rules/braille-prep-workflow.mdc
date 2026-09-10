@@ -21,9 +21,9 @@ Mission: turn scanned textbook pages into clean accessible text. Do not output G
 - Convert the earliest unused pages. Do not invent pages. Chat style samples are not source scans.
 
 ## OCR and interpretation
-- Default model: `gemini-3.8-flash` with `thinking_level=high` via `scripts/run_pipeline.py`.
-- Set `GEMINI_API_KEY` or `GOOGLE_API_KEY` before running live interpretation.
-- Pricing note: Gemini 3.8 Flash is the cost-effective default through Dec 31, 2026; verify current rates before large jobs.
+- Default: Cursor **subagent** with `gemini-3.8-flash-high` (see `.cursor/skills/interpret-batch/SKILL.md`). No API key required.
+- `scripts/run_pipeline.py` splits PDFs and tracks state; the orchestrating agent launches one subagent per pending batch.
+- Spot-check the first batch before processing a new book at scale.
 
 ## OCR cleanup
 - Strip running headers, footers, and lone page numbers.

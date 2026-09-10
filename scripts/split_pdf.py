@@ -1,4 +1,4 @@
-"""Split PDFs into 5-8 page batches for Gemini interpretation."""
+"""Split PDFs into 5-8 page batches for subagent interpretation."""
 
 from __future__ import annotations
 
