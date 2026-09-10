@@ -17,23 +17,9 @@ DEFAULT_BATCH_SIZE = 6
 # Cursor subagent model for batch interpretation (no direct API key required).
 DEFAULT_SUBAGENT_MODEL = "gemini-3.8-flash-high"
 
-INTERPRETATION_PROMPT = """You are transcribing scanned textbook pages into accessible plain text for later Grade 2 braille translation.
+INTERPRETATION_PROMPT = """Transcribe scanned textbook pages into accessible plain text for later Grade 2 braille translation.
 
-Rules:
-- Transcribe faithfully. Do not change lesson content.
-- Preserve intended paragraphs.
-- Use heading levels that match the book hierarchy.
-- Multi-digit numbers: include commas when appropriate (e.g. 1,000).
-- Dates and phone numbers: use hyphens as separators (e.g. March-4-2026, 555-123-4567).
-- Tables, numbered lists, lettered lists, and bullet points are allowed.
-- Do not nest numbered lists inside numbered lists; same for lettered lists.
-- Transcriber notes: separate paragraph for visuals that cannot be converted accessibly; skip the note if the visual was converted and nothing extra is needed.
-- Avoid square brackets, hash, ampersand, and asterisk unless they appear explicitly in the source text.
-- Strip running headers, footers, and lone page numbers.
-- Rejoin line-break hyphens across lines.
-- Read columns in order.
-- Use Caption: for figure captions.
-- If a word is unreadable, write [unclear] rather than guessing.
+Follow all rules in .cursor/rules/accessible-document-style.mdc. Transcribe faithfully — do not change lesson content. Use [unclear] for unreadable words. Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
 
 Output markdown only. No preamble or explanation outside the transcription.
 Source pages in this batch: {page_range}.

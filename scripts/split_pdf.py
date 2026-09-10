@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
 from config import BATCHES_DIR, MAX_PAGES_PER_BATCH, MIN_PAGES_PER_BATCH
+
+
+def source_sha256(source_pdf: Path) -> str:
+    digest = hashlib.sha256()
+    with source_pdf.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 @dataclass(frozen=True)
@@ -65,8 +74,15 @@ def split_pdf(
     source_pdf: Path,
     output_dir: Path | None = None,
     preferred_batch_size: int = 6,
+    *,
+    only_ranges: list[tuple[int, int]] | None = None,
+    skip_existing: bool = False,
 ) -> list[PageBatch]:
-    """Write batch PDFs and return metadata for each batch."""
+    """Write batch PDFs and return metadata for each batch.
+
+    When only_ranges is set, split just those inclusive page ranges.
+    When skip_existing is True, leave existing batch PDFs on disk unchanged.
+    """
     source_pdf = source_pdf.resolve()
     reader = PdfReader(str(source_pdf))
     total_pages = len(reader.pages)
@@ -76,14 +92,27 @@ def split_pdf(
     batch_root = output_dir or (BATCHES_DIR / source_pdf.stem)
     batch_root.mkdir(parents=True, exist_ok=True)
 
+    ranges = only_ranges if only_ranges is not None else plan_batches(total_pages, preferred_batch_size)
     batches: list[PageBatch] = []
-    for start, end in plan_batches(total_pages, preferred_batch_size):
+    for start, end in ranges:
+        batch_name = f"batch-{start:03d}-{end:03d}.pdf"
+        batch_pdf = batch_root / batch_name
+
+        if skip_existing and batch_pdf.exists():
+            batches.append(
+                PageBatch(
+                    source_pdf=source_pdf,
+                    start_page=start,
+                    end_page=end,
+                    batch_pdf=batch_pdf,
+                )
+            )
+            continue
+
         writer = PdfWriter()
         for page_index in range(start - 1, end):
             writer.add_page(reader.pages[page_index])
 
-        batch_name = f"batch-{start:03d}-{end:03d}.pdf"
-        batch_pdf = batch_root / batch_name
         with batch_pdf.open("wb") as handle:
             writer.write(handle)
 

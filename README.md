@@ -1,6 +1,6 @@
 # Textbook Braille Adaptation
 
-Turn scanned textbook PDFs into accessible plain-text markdown for later Grade 2 braille translation. A Cloud Agent watches `scans/`, splits PDFs into 5-8 page batches, and delegates each batch to a **Gemini Cursor subagent** for OCR and transcription into `accessible/`. No API key is required.
+Turn scanned textbook PDFs into accessible plain-text markdown for later Grade 2 braille translation. Drop PDFs in `scans/`, run the pipeline to split them into 5-8 page batches, and delegate each batch to a **Gemini Cursor subagent** for transcription into `accessible/`. No API key is required.
 
 ## Quick start
 
@@ -38,12 +38,13 @@ See `.cursor/skills/interpret-batch/SKILL.md` for the subagent prompt and checkl
 
 | Path | Purpose |
 | --- | --- |
-| `scans/` | Incoming PDFs and images |
+| `scans/` | Incoming PDFs (PDF only for now) |
 | `scans/.batches/` | Generated batch PDFs (gitignored) |
 | `accessible/` | Accessible markdown output |
 | `scripts/` | Pipeline Python tools (split + status only) |
 | `.cursor/rules/` | Style and agent workflow rules |
 | `.cursor/skills/interpret-batch/` | How to run interpretation subagents |
+| `.cursor/skills/orchestrate-pipeline/` | Full orchestration loop |
 
 ## Running in Cursor Cloud Agents
 
@@ -61,9 +62,12 @@ This repo includes `.cursor/environment.json` so Cloud Agents install Python dep
 ```bash
 python3 scripts/run_pipeline.py --status --json   # check progress
 python3 scripts/run_pipeline.py --dry-run         # plan batches
-python3 scripts/run_pipeline.py --manifest        # pending work for subagents
+python3 scripts/run_pipeline.py --manifest        # pending work for subagents (JSON)
+python3 scripts/run_pipeline.py --max-batches 3   # limit pending work shown
 python3 scripts/run_pipeline.py                   # split PDFs
 python3 scripts/run_pipeline.py --sync-state      # record completed output
+python3 scripts/run_pipeline.py --redo pages-001-005   # reprocess one batch
+python3 scripts/validate_accessible.py              # check accessible output style
 ```
 
 Pipeline state is tracked in `scans/.pipeline-state.json` so completed page ranges are skipped on reruns. See `.cursor/rules/agentic-pipeline.mdc` for the full agent checklist.
