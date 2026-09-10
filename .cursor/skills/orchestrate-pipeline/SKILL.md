@@ -31,7 +31,7 @@ Use this skill when the user asks to process scans, continue the pipeline, or ru
    # or validate all:
    python3 scripts/validate_accessible.py
    ```
-6. **Commit** — commit new `accessible/*.md` and updated `scans/.pipeline-state.json` separately from script changes when possible.
+6. **Commit** — verify the **Task** tool was called for each batch before committing; commit new `accessible/*.md` and updated `scans/.pipeline-state.json` separately from script changes when possible.
 7. **Repeat** until `--manifest` returns no pending batches.
 
 ## Flags
@@ -54,5 +54,6 @@ Use this skill when the user asks to process scans, continue the pipeline, or ru
 ## Do not
 
 - Process an entire book in one subagent call.
+- Transcribe batches inline in the orchestrator without launching a Task subagent.
 - Skip validation after the first batch on a new book.
 - Require `GEMINI_API_KEY` for the default workflow.

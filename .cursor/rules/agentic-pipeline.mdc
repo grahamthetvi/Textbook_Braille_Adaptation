@@ -71,6 +71,7 @@ Write markdown only to the output file. No preamble.
 
 ## Do not
 - Translate to braille in this repo.
+- Transcribe batches directly in the orchestrator agent — always launch a Task subagent per batch.
 - Require `GEMINI_API_KEY` for the default workflow.
 - Process whole chapters in one subagent call — keep batches at 5-8 pages.
 - Guess unreadable lesson words — use `[unclear]` per workflow rules.

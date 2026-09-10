@@ -7,6 +7,12 @@ description: Transcribe one PDF batch into accessible markdown using a Gemini Cu
 
 Interpretation runs inside Cursor via a **subagent** with a Gemini model. No `GEMINI_API_KEY` is required.
 
+## Critical: Orchestrator MUST NOT transcribe inline
+
+- **The orchestrator MUST NOT transcribe batches itself.** Zero inline transcription by the orchestrator.
+- The orchestrator **MUST launch a separate Task subagent** per batch with model `gemini-3.8-flash-high`.
+- **Failure mode to avoid:** orchestrator reading the batch PDF directly and writing the markdown file inline without delegating to a Gemini subagent.
+
 ## When to use
 
 - `python3 scripts/run_pipeline.py --status` shows pending batches
