@@ -11,74 +11,44 @@ alwaysApply: true
 
 ## Environment
 - Repository bootstrap: `.cursor/environment.json` runs `pip install -r scripts/requirements.txt` on agent start.
-- **No API key required.** Interpretation uses Cursor subagents with a Gemini model (`gemini-3.8-flash-high` or equivalent), not direct `google-genai` calls.
+- **No API key required.** Interpretation uses Cursor workers with `gemini-3.8-flash-medium` (see `DEFAULT_SUBAGENT_MODEL` in `scripts/config.py`). Do not call `google-genai`.
 - Skills: `.cursor/skills/orchestrate-pipeline/SKILL.md` (full loop), `.cursor/skills/interpret-batch/SKILL.md` (per batch).
-- Diagnostics: `cursor-cloud-get-events` for setup failures; `cursor-cloud-run-info` for run identity.
+- Token limits: `.cursor/rules/token-stewardship.mdc`.
 
 ## Cloud Agent
 - Nested Task subagents are unreliable; parallel Task subagents run on **separate VMs** and cannot write to this run's `/workspace`.
-- Orchestrator on the shared VM: split and status here, then process batches **sequentially** via **one same-VM interpretation worker per batch** (`gemini-3.8-flash-high`). Workers must not spawn nested Tasks.
+- Orchestrator on the shared VM: split, status, sync, validate, and commit here. Process batches **sequentially** — one same-VM interpretation worker per batch. Workers must not spawn nested Tasks.
 - Do **not** launch parallel Task subagents for file-writing work. See `.cursor/skills/orchestrate-pipeline/SKILL.md` § Cloud Agent.
 
 ## Commands
 ```bash
 pip install -r scripts/requirements.txt
-python3 scripts/run_pipeline.py --status          # progress only
-python3 scripts/run_pipeline.py --status --json   # machine-readable status
-python3 scripts/run_pipeline.py --manifest        # pending batches only (JSON)
-python3 scripts/run_pipeline.py --max-batches 3   # limit pending work returned
-python3 scripts/run_pipeline.py --dry-run         # plan batches only
-python3 scripts/run_pipeline.py --json              # split PDFs + pending manifest
-python3 scripts/run_pipeline.py --sync-state      # update state after subagent output
-python3 scripts/run_pipeline.py --redo pages-001-005  # reprocess one batch
-python3 scripts/run_pipeline.py --file scans/example.pdf
+python3 scripts/run_pipeline.py --status --json
+python3 scripts/run_pipeline.py --manifest --batches 4 --spawn-prompt   # user: "process 4 batches"
+python3 scripts/run_pipeline.py --manifest --pages 20 --spawn-prompt  # user: "process 20 pages"
+python3 scripts/run_pipeline.py --dry-run
+python3 scripts/run_pipeline.py                                       # split pending batch PDFs
+python3 scripts/run_pipeline.py --sync-state
+python3 scripts/run_pipeline.py --redo pages-001-005
 python3 scripts/validate_accessible.py accessible/pages-001-005.md
 ```
 
 ## Agent checklist
-1. Run `python3 scripts/run_pipeline.py --status --json` and report pending batches.
-2. Run `python3 scripts/run_pipeline.py` (no flags) to split any new PDFs into `scans/.batches/`.
-3. For each pending batch (start with one on a new book), delegate to a Gemini worker with model `gemini-3.8-flash-high` (Task subagent on desktop; same-VM worker on Cloud Agent — sequential only):
-   - Input: batch PDF path from manifest (`scans/.batches/<stem>/batch-NNN-NNN.pdf`)
-   - Output: `accessible/pages-NNN-NNN.md` (or `<unit>_pages-NNN-NNN.md`)
-   - Prompt: use `INTERPRETATION_PROMPT` from `scripts/config.py` plus `.cursor/rules/accessible-document-style.mdc`
-4. After subagent writes output, run `--sync-state`, then `python3 scripts/validate_accessible.py` on the new file.
-5. Process incrementally (`--max-batches 3` per orchestrator turn on first runs); spot-check output before large jobs.
-6. Spot-check one output file against `accessible-document-style.mdc`.
-7. Commit new `accessible/*.md` and `scans/.pipeline-state.json` separately from script changes when possible.
-8. Open a draft PR for accessible output; keep `scans/.pipeline-state.json` committed so reruns resume.
-
-## Subagent prompt template
-```
-Transcribe the scanned textbook pages in this batch PDF into accessible markdown.
-
-Batch PDF: <batch_pdf path>
-Output file: <accessible/output-filename.md>
-Source pages: <start_page>-<end_page> (1-based, inclusive)
-
-Follow .cursor/rules/accessible-document-style.mdc.
-
-<INTERPRETATION_PROMPT from scripts/config.py with page_range filled>
-
-Write markdown only to the output file. No preamble.
-```
+1. Map the user request to `--batches N` or `--pages N`, then run `--manifest --spawn-prompt`.
+2. Run `python3 scripts/run_pipeline.py` to split any new pending batch PDFs.
+3. Process pending batches **one at a time on Cloud Agent** (sequential same-VM workers from `spawn.tasks`).
+4. Run `--sync-state` and `validate_accessible.py` after each batch.
+5. On a new book, start with one batch; spot-check before scaling up.
+6. Commit `accessible/*.md` and `scans/.pipeline-state.json` separately from script changes.
 
 ## Resume and state
-- Pipeline state: `scans/.pipeline-state.json` is committed and tracks completed page ranges per source file (including `unit_prefix` in keys when used).
-- Completed ranges require the output file to exist; stale state entries are ignored automatically.
-- Use `--redo pages-001-005` to delete output and clear state, or `--reset-batch pages-001-005` to clear state only.
-- Source PDF sha256 is stored in state; status warns when the file changes.
-- Split batch PDFs live in `scans/.batches/<stem>/` (gitignored). Only pending ranges are re-split; existing batch PDFs are kept unless the source changed.
-
-## Outputs
-- Split PDF chunks: `scans/.batches/<stem>/batch-001-007.pdf`
-- Accessible markdown: `accessible/pages-001-007.md` or `accessible/<unit>_pages-001-007.md`
+- `scans/.pipeline-state.json` is committed; completed ranges require the output file to exist.
+- `--redo pages-001-005` deletes output and clears state for one batch.
+- Source PDF sha256 is tracked; status warns when the file changes.
 
 ## Do not
-- Translate to braille in this repo.
-- Transcribe batches directly in the orchestrator agent — always delegate per batch (Task subagent on desktop; same-VM worker on Cloud Agent).
-- Launch parallel Task subagents for file-writing work on Cloud Agent.
-- Require `GEMINI_API_KEY` for the default workflow.
-- Process whole chapters in one subagent call — keep batches at 5-8 pages.
-- Guess unreadable lesson words — use `[unclear]` per workflow rules.
-- Process all batches without verifying the first batch when starting a new book.
+- Require `GEMINI_API_KEY` or call `gemini_interpret.py` / `google-genai`.
+- Launch parallel or nested Task subagents for file-writing on Cloud Agent.
+- Transcribe batches inline in the orchestrator.
+- Process whole chapters in one worker call.
+- Render extra page images when the batch PDF is available.

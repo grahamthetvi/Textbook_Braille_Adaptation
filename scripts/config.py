@@ -15,7 +15,11 @@ MAX_PAGES_PER_BATCH = 8
 DEFAULT_BATCH_SIZE = 6
 
 # Cursor subagent model for batch interpretation (no direct API key required).
-DEFAULT_SUBAGENT_MODEL = "gemini-3.8-flash-high"
+# Medium is enough for faithful OCR transcription; avoid "high" unless quality fails.
+DEFAULT_SUBAGENT_MODEL = "gemini-3.8-flash-medium"
+
+# Cap parallel interpretation subagents per orchestrator turn to limit token spend.
+MAX_SUBAGENTS_PER_TURN = 3
 
 INTERPRETATION_PROMPT = """Transcribe scanned textbook pages into accessible plain text for later Grade 2 braille translation.
 

@@ -18,12 +18,20 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from config import ACCESSIBLE_DIR, BATCHES_DIR, SCANS_DIR, STATE_FILE
+from config import (
+    ACCESSIBLE_DIR,
+    BATCHES_DIR,
+    DEFAULT_SUBAGENT_MODEL,
+    MAX_SUBAGENTS_PER_TURN,
+    SCANS_DIR,
+    STATE_FILE,
+)
+from spawn_prompt import build_spawn_manifest
 from split_pdf import PageBatch, describe_plan, source_sha256, split_pdf
 
 CLOUD_AGENT_NOTE = (
     "Cloud Agent: process batches sequentially with same-VM interpretation workers "
-    "(gemini-3.8-flash-high). Do not launch parallel or nested Task subagents for "
+    f"({DEFAULT_SUBAGENT_MODEL}). Do not launch parallel or nested Task subagents for "
     "file-writing work — they run on separate VMs and cannot write to this "
     "/workspace. See .cursor/skills/orchestrate-pipeline/SKILL.md § Cloud Agent."
 )
@@ -192,6 +200,26 @@ def reset_batch(
     return reset_count
 
 
+def limit_pending(
+    pending: list[dict],
+    *,
+    max_batches: int | None = None,
+    max_pages: int | None = None,
+) -> list[dict]:
+    """Cap pending work by batch count and/or source page count."""
+    selected: list[dict] = []
+    page_count = 0
+    for batch in pending:
+        batch_pages = batch["end_page"] - batch["start_page"] + 1
+        if max_pages is not None and selected and page_count >= max_pages:
+            break
+        if max_batches is not None and len(selected) >= max_batches:
+            break
+        selected.append(batch)
+        page_count += batch_pages
+    return selected
+
+
 def planned_batches(
     source_pdf: Path,
     state: dict,
@@ -252,6 +280,8 @@ def build_status(
     selected_file: Path | None = None,
     unit_prefix: str | None = None,
     max_batches: int | None = None,
+    max_pages: int | None = None,
+    spawn_prompt: bool = False,
 ) -> dict:
     pdfs = list_scan_pdfs(selected_file)
     state = load_state()
@@ -289,6 +319,14 @@ def build_status(
         )
         if max_batches is not None and len(pending) >= max_batches:
             break
+        if max_pages is not None:
+            page_total = sum(
+                batch["end_page"] - batch["start_page"] + 1 for batch in pending
+            )
+            if page_total >= max_pages:
+                break
+
+    pending = limit_pending(pending, max_batches=max_batches, max_pages=max_pages)
 
     save_state(state)
 
@@ -296,8 +334,10 @@ def build_status(
     if not pdfs:
         blockers.append(f"No PDFs found in {SCANS_DIR}")
 
-    return {
+    payload = {
         "interpretation_mode": "cursor_subagent",
+        "subagent_model": DEFAULT_SUBAGENT_MODEL,
+        "launch_limit_per_turn": MAX_SUBAGENTS_PER_TURN,
         "cloud_agent_note": CLOUD_AGENT_NOTE,
         "scans_dir": str(SCANS_DIR),
         "accessible_dir": str(ACCESSIBLE_DIR),
@@ -307,11 +347,15 @@ def build_status(
         "total_batches": total_batches,
         "done_batches": done_batches,
         "pending_batches": pending_batches,
-        "pending": pending[:max_batches] if max_batches else pending,
+        "pending_selected": len(pending),
+        "pending": pending,
         "sources": sources,
         "warnings": warnings,
         "blockers": blockers,
     }
+    if spawn_prompt:
+        payload["spawn"] = build_spawn_manifest(pending)
+    return payload
 
 
 def print_status(status: dict, *, as_json: bool, manifest: bool = False) -> None:
@@ -319,12 +363,17 @@ def print_status(status: dict, *, as_json: bool, manifest: bool = False) -> None
         payload = status
         if manifest:
             payload = {
+                "interpretation_mode": status["interpretation_mode"],
+                "subagent_model": status["subagent_model"],
+                "launch_limit_per_turn": status["launch_limit_per_turn"],
                 "pending_batches": status["pending_batches"],
+                "pending_selected": status["pending_selected"],
                 "pending": status["pending"],
                 "warnings": status.get("warnings", []),
                 "blockers": status.get("blockers", []),
             }
-        if status.get("interpretation_mode") == "cursor_subagent":
+            if "spawn" in status:
+                payload["spawn"] = status["spawn"]
             payload["cloud_agent_note"] = status.get("cloud_agent_note", CLOUD_AGENT_NOTE)
         print(json.dumps(payload, indent=2))
         return
@@ -338,8 +387,7 @@ def print_status(status: dict, *, as_json: bool, manifest: bool = False) -> None
         f"{status['pending_batches']} pending"
     )
     print(f"Interpretation mode: {status['interpretation_mode']} (no API key required)")
-    if status.get("interpretation_mode") == "cursor_subagent":
-        print(f"Cloud Agent: {status.get('cloud_agent_note', CLOUD_AGENT_NOTE)}")
+    print(f"Cloud Agent: {status.get('cloud_agent_note', CLOUD_AGENT_NOTE)}")
     for warning in status.get("warnings", []):
         print(f"Warning: {warning}")
     for source in status["sources"]:
@@ -352,10 +400,11 @@ def print_status(status: dict, *, as_json: bool, manifest: bool = False) -> None
                 f"  {batch['start_page']:03d}-{batch['end_page']:03d} -> "
                 f"{batch['output_file']} [{batch['status']}]"
             )
-    if status["pending_batches"] > 0:
+    if status.get("pending_selected", 0) > 0:
         print(
-            "\nNext step: launch a Gemini subagent for each pending batch "
-            "(see .cursor/skills/interpret-batch/SKILL.md)."
+            f"\nNext step: launch up to {status['launch_limit_per_turn']} foreground Gemini "
+            f"subagent(s) ({status['subagent_model']}) for the selected pending batch(es). "
+            "Run `python3 scripts/run_pipeline.py --manifest --spawn-prompt` for Task prompts."
         )
     if status["blockers"]:
         print("\nBlockers:")
@@ -370,6 +419,7 @@ def run(
     unit_prefix: str | None = None,
     as_json: bool = False,
     max_batches: int | None = None,
+    max_pages: int | None = None,
 ) -> int:
     pdfs = list_scan_pdfs(selected_file)
     if not pdfs:
@@ -459,17 +509,27 @@ def run(
 
         if max_batches is not None and len(pending) >= max_batches:
             break
+        if max_pages is not None:
+            page_total = sum(
+                batch["end_page"] - batch["start_page"] + 1 for batch in pending
+            )
+            if page_total >= max_pages:
+                break
+
+    pending = limit_pending(pending, max_batches=max_batches, max_pages=max_pages)
 
     save_state(state)
     summary = {
         "interpretation_mode": "cursor_subagent",
+        "subagent_model": DEFAULT_SUBAGENT_MODEL,
+        "launch_limit_per_turn": MAX_SUBAGENTS_PER_TURN,
         "cloud_agent_note": CLOUD_AGENT_NOTE,
         "planned": planned,
         "split": split_count,
         "skipped": skipped,
         "dry_run": dry_run,
         "pending_batches": len(pending),
-        "pending": pending[:max_batches] if max_batches else pending,
+        "pending": pending,
         "results": results,
         "warnings": warnings,
         "exit_code": 0,
@@ -481,13 +541,13 @@ def run(
             f"\nSummary: planned={planned}, split={split_count}, skipped={skipped}, "
             f"pending={len(pending)}, dry_run={dry_run}"
         )
+        print(f"Cloud Agent: {CLOUD_AGENT_NOTE}")
         if pending:
             print(
-                "Interpretation is agent-driven. Launch a Gemini subagent per pending batch "
-                "(see .cursor/skills/interpret-batch/SKILL.md), then run "
+                "Interpretation is agent-driven. Process one batch at a time on Cloud Agent "
+                "(see .cursor/skills/orchestrate-pipeline/SKILL.md), then run "
                 "`python3 scripts/run_pipeline.py --sync-state`."
             )
-            print(f"Cloud Agent: {CLOUD_AGENT_NOTE}")
     return 0
 
 
@@ -529,9 +589,22 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--max-batches",
+        "--batches",
         type=int,
         metavar="N",
+        dest="max_batches",
         help="Limit pending batches returned in manifest/status/run output",
+    )
+    parser.add_argument(
+        "--pages",
+        type=int,
+        metavar="N",
+        help="Limit pending work to roughly N source pages (may include one extra partial batch)",
+    )
+    parser.add_argument(
+        "--spawn-prompt",
+        action="store_true",
+        help="Include ready-to-use Task subagent prompts in JSON manifest output",
     )
     parser.add_argument(
         "--reset-batch",
@@ -601,6 +674,8 @@ def main(argv: list[str] | None = None) -> int:
                 selected_file=selected,
                 unit_prefix=args.unit_prefix,
                 max_batches=args.max_batches,
+                max_pages=args.pages,
+                spawn_prompt=args.spawn_prompt,
             )
             print_status(status, as_json=args.json or args.manifest, manifest=args.manifest)
             return 1 if status["source_count"] == 0 else 0
@@ -611,6 +686,7 @@ def main(argv: list[str] | None = None) -> int:
             unit_prefix=args.unit_prefix,
             as_json=args.json,
             max_batches=args.max_batches,
+            max_pages=args.pages,
         )
     except FileNotFoundError as exc:
         message = str(exc)
