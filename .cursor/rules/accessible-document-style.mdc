@@ -50,3 +50,19 @@ GOOD: a section break as `---`
 Possessive apostrophes, hyphens, dashes, and quotation marks are allowed when the book uses them.
 
 After writing, search the file for `[]`, `#`, `&`, and `*` and rephrase any hit unless the symbol is truly in the source.
+
+## Word clouds and decorative covers
+Word clouds, title-page art, and other decorative layouts are not lesson content.
+
+BAD: reproducing a word cloud as a dense comma-separated list of unrelated terms
+BAD: transcribing cover art as if it were a reading passage
+GOOD: skip decorative word clouds unless specific words are required for the lesson
+GOOD: transcribe the book title, edition, and copyright block on a cover when printed as normal text
+GOOD: `Transcriber note: A decorative word cloud fills the cover; no lesson text is present.` when the page has no readable lesson content
+
+## URLs and web addresses
+Spell out URLs accessibly when they appear in copyright or permissions text.
+
+BAD: hiding a permissions URL or breaking it across lines without separators
+GOOD: keep the full URL on one line when the book prints it that way, for example `https://example.com/permissions`
+GOOD: introduce it plainly when helpful, for example `Permissions website: https://example.com/permissions`

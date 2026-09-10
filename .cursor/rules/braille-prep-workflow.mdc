@@ -8,11 +8,12 @@ alwaysApply: true
 Mission: turn scanned textbook pages into clean accessible text. Do not output Grade 2 braille, contractions, or braille ASCII.
 
 ## Agentic workflow
-1. User drops PDFs or page images in `scans/`.
-2. Agent or automation checks `scans/` for unprocessed files.
-3. Run `python3 scripts/run_pipeline.py` (or `--dry-run` first) to split PDFs and interpret batches.
-4. Review output in `accessible/`; edit only for OCR cleanup and style — not lesson content.
-5. Mark source files done by leaving matching outputs in `accessible/` (pipeline skips completed ranges).
+1. User drops PDFs in `scans/` (PDF only for now).
+2. Agent checks pending work with `python3 scripts/run_pipeline.py --status --json`.
+3. Run `python3 scripts/run_pipeline.py` (or `--dry-run` first) to split pending PDF ranges into batch PDFs.
+4. Launch Cursor subagents to transcribe each pending batch (see `.cursor/skills/interpret-batch/SKILL.md`).
+5. Run `--sync-state`, validate with `python3 scripts/validate_accessible.py`, then review output in `accessible/`.
+6. Completed batches are tracked in `scans/.pipeline-state.json` (committed).
 
 ## Batch and files
 - Split each PDF into batches of 5-8 internal pages for the whole document.
@@ -20,10 +21,11 @@ Mission: turn scanned textbook pages into clean accessible text. Do not output G
 - If the unit title is known, prefix it: `adjectives_pages-001-007.md`.
 - Convert the earliest unused pages. Do not invent pages. Chat style samples are not source scans.
 
-## OCR and interpretation
-- Default model: `gemini-3.8-flash` with `thinking_level=high` via `scripts/run_pipeline.py`.
-- Set `GEMINI_API_KEY` or `GOOGLE_API_KEY` before running live interpretation.
-- Pricing note: Gemini 3.8 Flash is the cost-effective default through Dec 31, 2026; verify current rates before large jobs.
+## Transcription
+- Default: Cursor **subagent** with `gemini-3.8-flash-high` (see `.cursor/skills/interpret-batch/SKILL.md`). No API key required.
+- `scripts/run_pipeline.py` splits PDFs and tracks state; the orchestrating agent launches one subagent per pending batch.
+- Validate each output with `python3 scripts/validate_accessible.py` before large jobs.
+- Spot-check the first batch before processing a new book at scale.
 
 ## OCR cleanup
 - Strip running headers, footers, and lone page numbers.
