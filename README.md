@@ -53,17 +53,37 @@ python3 scripts/run_pipeline.py --skip-interpret
 | `scripts/` | Pipeline Python tools |
 | `.cursor/rules/` | Style and agent workflow rules |
 
-## Cloud Agent operation
+## Running in Cursor Cloud Agents
 
-See `.cursor/rules/agentic-pipeline.mdc` for the agent checklist. Typical loop:
+This repo includes `.cursor/environment.json` so Cloud Agents install Python dependencies automatically. After merging environment changes, open the environment in Cursor and **Save** the proposed configuration when prompted.
 
-1. List new files in `scans/`.
-2. Run `python3 scripts/run_pipeline.py --dry-run` and report planned batches.
-3. Run the pipeline when `GEMINI_API_KEY` is available.
-4. Spot-check one output file against style rules.
-5. Commit `accessible/*.md` separately from tooling changes when possible.
+### Required secrets
 
-Pipeline state is tracked in `scans/.pipeline-state.json` so completed page ranges are skipped on reruns.
+| Secret | Required | Purpose |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | Yes (or `GOOGLE_API_KEY`) | Gemini OCR and transcription |
+| `GEMINI_MODEL` | No | Override default `gemini-3.8-flash` |
+| `GEMINI_THINKING_LEVEL` | No | Override default `high` |
+
+Add `GEMINI_API_KEY` in the [Cloud Agent environment settings](https://cursor.com/dashboard/cloud-agents/environments) for this repository. Agents can request it via `cursor-cloud-request-environment-setup-actions` when missing.
+
+### Drop a scan and ask the agent
+
+1. Upload or commit a PDF under `scans/` (for example `scans/Grammar Workbook.pdf`).
+2. Start a Cloud Agent on this repo and ask it to process the scan.
+3. The agent should run `python3 scripts/run_pipeline.py --status --json`, then process pending batches (often with `--max-batches 1` first).
+4. Review the PR or commits for new files in `accessible/`.
+
+### Agent commands
+
+```bash
+python3 scripts/run_pipeline.py --status --json   # check progress
+python3 scripts/run_pipeline.py --dry-run         # plan batches
+python3 scripts/run_pipeline.py --max-batches 1   # proof run
+python3 scripts/run_pipeline.py                   # full pending work
+```
+
+Pipeline state is tracked in `scans/.pipeline-state.json` so completed page ranges are skipped on reruns. See `.cursor/rules/agentic-pipeline.mdc` for the full agent checklist.
 
 ## Style rules
 

@@ -9,28 +9,44 @@ alwaysApply: true
 - New or updated files in `scans/` are the processing trigger.
 - On each run, list `scans/` and compare against `accessible/` output names before calling Gemini.
 
+## Environment
+- Repository bootstrap: `.cursor/environment.json` runs `pip install -r scripts/requirements.txt` on agent start.
+- Required secret: `GEMINI_API_KEY` (or `GOOGLE_API_KEY`). If missing, call `cursor-cloud-request-environment-setup-actions` with `add_secrets` before live interpretation.
+- Environment dashboard: use `cursor-cloud-environment-info` to confirm which config source is active (`environmentJsonPath` should be `.cursor/environment.json` after merge).
+- Diagnostics: `cursor-cloud-get-events` for setup failures; `cursor-cloud-run-info` for run identity.
+
 ## Commands
 ```bash
 pip install -r scripts/requirements.txt
-export GEMINI_API_KEY="your-key"   # or GOOGLE_API_KEY
-python3 scripts/run_pipeline.py --dry-run   # plan batches only
-python3 scripts/run_pipeline.py             # split + interpret pending work
+python3 scripts/run_pipeline.py --status          # progress only
+python3 scripts/run_pipeline.py --status --json   # machine-readable status
+python3 scripts/run_pipeline.py --dry-run         # plan batches only
+python3 scripts/run_pipeline.py --max-batches 1 # incremental proof run
+python3 scripts/run_pipeline.py                   # split + interpret pending work
 python3 scripts/run_pipeline.py --file scans/example.pdf
 ```
 
 ## Agent checklist
-1. Confirm `scans/` has input and note filenames.
-2. Run `--dry-run` and report planned batch ranges.
-3. Run the pipeline when an API key is available; otherwise split PDFs and stop with a clear blocker message.
-4. Spot-check one output file against style rules in `accessible-document-style.mdc`.
-5. Commit new `accessible/*.md` separately from script changes when possible.
+1. Call `cursor-cloud-environment-info` and confirm `GEMINI_API_KEY` is set (or request it).
+2. Run `python3 scripts/run_pipeline.py --status --json` and report pending batches.
+3. Run `--dry-run` when batch layout is unclear.
+4. Process incrementally with `--max-batches N` on first runs; spot-check output before large jobs.
+5. If the API key is missing, run `--skip-interpret` to split PDFs, then stop with the blocker from `--status`.
+6. Spot-check one output file against `accessible-document-style.mdc`.
+7. Commit new `accessible/*.md` separately from script changes when possible.
+8. Open a draft PR for accessible output; keep `scans/.pipeline-state.json` committed so reruns resume.
+
+## Resume and state
+- Pipeline state: `scans/.pipeline-state.json` tracks completed page ranges per source file.
+- Completed ranges are skipped automatically; deleting an `accessible/*.md` file does not reset state — edit state or re-run with a new output name.
+- Split batch PDFs live in `scans/.batches/<stem>/` (gitignored). Re-split happens when interpretation runs.
 
 ## Outputs
 - Split PDF chunks: `scans/.batches/<stem>/batch-001-007.pdf`
 - Accessible markdown: `accessible/pages-001-007.md` or `accessible/<unit>_pages-001-007.md`
-- Pipeline state: `scans/.pipeline-state.json` tracks completed page ranges per source file
 
 ## Do not
 - Translate to braille in this repo.
 - Process whole chapters in one Gemini call — keep batches at 5-8 pages.
 - Guess unreadable lesson words — use `[unclear]` per workflow rules.
+- Process all batches without verifying the first batch when starting a new book.
