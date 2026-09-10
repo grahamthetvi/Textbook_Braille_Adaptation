@@ -15,6 +15,11 @@ alwaysApply: true
 - Skills: `.cursor/skills/orchestrate-pipeline/SKILL.md` (full loop), `.cursor/skills/interpret-batch/SKILL.md` (per batch).
 - Diagnostics: `cursor-cloud-get-events` for setup failures; `cursor-cloud-run-info` for run identity.
 
+## Cloud Agent
+- Nested Task subagents are unreliable; parallel Task subagents run on **separate VMs** and cannot write to this run's `/workspace`.
+- Orchestrator on the shared VM: split and status here, then process batches **sequentially** via **one same-VM interpretation worker per batch** (`gemini-3.8-flash-high`). Workers must not spawn nested Tasks.
+- Do **not** launch parallel Task subagents for file-writing work. See `.cursor/skills/orchestrate-pipeline/SKILL.md` § Cloud Agent.
+
 ## Commands
 ```bash
 pip install -r scripts/requirements.txt
@@ -33,7 +38,7 @@ python3 scripts/validate_accessible.py accessible/pages-001-005.md
 ## Agent checklist
 1. Run `python3 scripts/run_pipeline.py --status --json` and report pending batches.
 2. Run `python3 scripts/run_pipeline.py` (no flags) to split any new PDFs into `scans/.batches/`.
-3. For each pending batch (start with one on a new book), launch a **Task subagent** with model `gemini-3.8-flash-high`:
+3. For each pending batch (start with one on a new book), delegate to a Gemini worker with model `gemini-3.8-flash-high` (Task subagent on desktop; same-VM worker on Cloud Agent — sequential only):
    - Input: batch PDF path from manifest (`scans/.batches/<stem>/batch-NNN-NNN.pdf`)
    - Output: `accessible/pages-NNN-NNN.md` (or `<unit>_pages-NNN-NNN.md`)
    - Prompt: use `INTERPRETATION_PROMPT` from `scripts/config.py` plus `.cursor/rules/accessible-document-style.mdc`
@@ -71,7 +76,8 @@ Write markdown only to the output file. No preamble.
 
 ## Do not
 - Translate to braille in this repo.
-- Transcribe batches directly in the orchestrator agent — always launch a Task subagent per batch.
+- Transcribe batches directly in the orchestrator agent — always delegate per batch (Task subagent on desktop; same-VM worker on Cloud Agent).
+- Launch parallel Task subagents for file-writing work on Cloud Agent.
 - Require `GEMINI_API_KEY` for the default workflow.
 - Process whole chapters in one subagent call — keep batches at 5-8 pages.
 - Guess unreadable lesson words — use `[unclear]` per workflow rules.

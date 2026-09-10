@@ -50,11 +50,13 @@ See `.cursor/skills/interpret-batch/SKILL.md` for the subagent prompt and checkl
 
 This repo includes `.cursor/environment.json` so Cloud Agents install Python dependencies automatically (`pypdf` only). After merging environment changes, open the environment in Cursor and **Save** the proposed configuration when prompted.
 
+**Cloud Agent constraint:** parallel or nested Task subagents do not share this run's `/workspace`. The orchestrator must process batches **sequentially** on the shared VM — one same-VM Gemini worker per batch (`gemini-3.8-flash-high`), not parallel Task spawns. See `.cursor/skills/orchestrate-pipeline/SKILL.md` § Cloud Agent.
+
 ### Drop a scan and ask the agent
 
 1. Upload or commit a PDF under `scans/` (for example `scans/Grammar Workbook.pdf`).
 2. Start a Cloud Agent on this repo and ask it to **process the scan**.
-3. The agent should run `python3 scripts/run_pipeline.py --status --json`, split PDFs, then launch Gemini subagents for pending batches (often one batch first).
+3. The agent should run `python3 scripts/run_pipeline.py --status --json`, split PDFs, then run one same-VM interpretation worker per pending batch (often one batch first, sequentially).
 4. Review the PR or commits for new files in `accessible/`.
 
 ### Agent commands

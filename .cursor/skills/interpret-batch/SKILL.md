@@ -10,8 +10,21 @@ Interpretation runs inside Cursor via a **subagent** with a Gemini model. No `GE
 ## Critical: Orchestrator MUST NOT transcribe inline
 
 - **The orchestrator MUST NOT transcribe batches itself.** Zero inline transcription by the orchestrator.
-- The orchestrator **MUST launch a separate Task subagent** per batch with model `gemini-3.8-flash-high`.
-- **Failure mode to avoid:** orchestrator reading the batch PDF directly and writing the markdown file inline without delegating to a Gemini subagent.
+- The orchestrator **MUST delegate** each batch to a Gemini interpretation worker with model `gemini-3.8-flash-high` (see platform notes below).
+- **Failure mode to avoid:** orchestrator reading the batch PDF directly and writing the markdown file inline without delegating.
+
+## Cloud Agent vs Desktop Cursor
+
+| | Desktop Cursor | Cloud Agent |
+| --- | --- | --- |
+| Worker | Launch a **Task subagent** per batch (shares workspace) | Launch **one same-VM worker** per batch on the shared VM |
+| Parallelism | Up to 3 batches per orchestrator turn is OK when workers share `/workspace` | **Sequential only** — parallel Task subagents run on separate VMs and cannot write here |
+| Nested Tasks | Subagents may spawn tools as needed | Interpretation worker must **not** spawn nested Task subagents |
+| API key | Not required | Not required |
+
+**"Gemini subagent"** in this repo means the Gemini model/role doing transcription — not necessarily a nested Task spawn. On Cloud Agent, the worker runs `gemini-3.8-flash-high` directly on the current VM and writes files locally.
+
+See `.cursor/skills/orchestrate-pipeline/SKILL.md` § Cloud Agent for the orchestrator loop.
 
 ## When to use
 
@@ -39,9 +52,11 @@ Interpretation runs inside Cursor via a **subagent** with a Gemini model. No `GE
 
 See `.cursor/skills/orchestrate-pipeline/SKILL.md` for the full loop.
 
-## Launch one interpretation subagent
+## Launch one interpretation worker
 
-Use the **Task** tool with model `gemini-3.8-flash-high` (or `DEFAULT_SUBAGENT_MODEL` from `scripts/config.py`).
+**Desktop Cursor:** use the **Task** tool with model `gemini-3.8-flash-high` (or `DEFAULT_SUBAGENT_MODEL` from `scripts/config.py`).
+
+**Cloud Agent:** launch one same-VM worker per batch (not parallel Tasks). The worker must not spawn nested Task subagents.
 
 Pass a prompt like:
 
