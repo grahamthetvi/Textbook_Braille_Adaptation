@@ -1,46 +1,24 @@
 /** Client-side checks matching scripts/validate_accessible.py. */
 
-const FORBIDDEN_CHARS = "#&*";
-const NESTED_NUMBERED = /^(\s*)(\d+)\.\s/;
-const NESTED_LETTERED = /^(\s*)([a-zA-Z])\.\s/;
+const FORBIDDEN_DEFAULT = "#&*[]{}";
+const FORBIDDEN_LATEX_MATH = "#&*[]";
 
-function indentLevel(line) {
-  return line.length - line.trimStart().length;
+export function forbiddenChars(latexMath = false) {
+  return latexMath ? FORBIDDEN_LATEX_MATH : FORBIDDEN_DEFAULT;
 }
 
-export function validateMarkdown(text, label = "output") {
+export function validateMarkdown(text, label = "output", options = {}) {
   const issues = [];
+  const latexMath = Boolean(options.latexMath);
+  const forbidden = forbiddenChars(latexMath);
   const lines = text.split(/\r?\n/);
-  let prevNumberIndent = null;
-  let prevLetterIndent = null;
 
   lines.forEach((line, index) => {
     const lineno = index + 1;
-    for (const char of FORBIDDEN_CHARS) {
+    for (const char of forbidden) {
       if (line.includes(char)) {
         issues.push(`${label}:${lineno}: forbidden character '${char}'`);
       }
-    }
-
-    const stripped = line.trimStart();
-    const indent = indentLevel(line);
-
-    if (NESTED_NUMBERED.test(line)) {
-      if (prevNumberIndent !== null && indent > prevNumberIndent) {
-        issues.push(`${label}:${lineno}: nested numbered list`);
-      }
-      prevNumberIndent = indent;
-    } else if (stripped && !stripped.startsWith("-") && !stripped.startsWith("*") && !stripped.startsWith("•")) {
-      prevNumberIndent = null;
-    }
-
-    if (NESTED_LETTERED.test(line)) {
-      if (prevLetterIndent !== null && indent > prevLetterIndent) {
-        issues.push(`${label}:${lineno}: nested lettered list`);
-      }
-      prevLetterIndent = indent;
-    } else if (stripped && !stripped.startsWith("-") && !stripped.startsWith("*") && !stripped.startsWith("•")) {
-      prevLetterIndent = null;
     }
   });
 

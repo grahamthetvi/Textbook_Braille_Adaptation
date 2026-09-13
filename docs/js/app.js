@@ -5,6 +5,7 @@
 
 import { splitPdfBytes, inspectPdf } from "./pdf-split.js";
 import { transcribeBatch, MODEL_OPTIONS, DEFAULT_MODEL } from "./gemini.js";
+import { parseClarify } from "./prompt.js";
 import { validateMarkdown } from "./validate.js";
 import { downloadCombined, downloadDocx, downloadZip } from "./download.js";
 import { planBatches } from "./batches.js";
@@ -23,6 +24,7 @@ const state = {
   abortController: null,
   dragDepth: 0,
   lastSplitPreferred: null,
+  lastClarifyKey: "",
 };
 
 function cacheElements() {
@@ -49,6 +51,13 @@ function cacheElements() {
   els.downloadDocxBtn = document.getElementById("download-docx-btn");
   els.downloadMdBtn = document.getElementById("download-md-btn");
   els.downloadZipBtn = document.getElementById("download-zip-btn");
+  els.latexMath = document.getElementById("latex-math");
+  els.clarifySection = document.getElementById("clarify-section");
+  els.clarifyMeta = document.getElementById("clarify-meta");
+  els.clarifyQuestion = document.getElementById("clarify-question");
+  els.clarifyAnswer = document.getElementById("clarify-answer");
+  els.clarifyContinueBtn = document.getElementById("clarify-continue-btn");
+  els.clarifyRetryBtn = document.getElementById("clarify-retry-btn");
 }
 
 function getPreferredBatchSize() {
@@ -135,7 +144,11 @@ function setRunning(running) {
   els.batchSize.disabled = running;
   els.model.disabled = running;
   els.customModel.disabled = running || els.model.value !== CUSTOM_MODEL_VALUE;
+  els.latexMath.disabled = running;
   els.cancelBtn.disabled = !running;
+  els.clarifyContinueBtn.disabled = running;
+  els.clarifyRetryBtn.disabled = running;
+  els.clarifyAnswer.disabled = running;
   els.form.setAttribute("aria-busy", running ? "true" : "false");
 }
 
@@ -167,7 +180,13 @@ function renderBatchList() {
 
     const status = document.createElement("span");
     status.className = "batch-status";
-    status.textContent = batch.status === "retrying" ? "retrying" : batch.status;
+    if (batch.status === "retrying") {
+      status.textContent = "retrying";
+    } else if (batch.status === "clarify") {
+      status.textContent = "needs clarification";
+    } else {
+      status.textContent = batch.status;
+    }
 
     const issues = document.createElement("span");
     issues.className = "batch-issues";
@@ -206,6 +225,28 @@ function renderErrors() {
   }
 }
 
+function renderClarify() {
+  const batch = state.batches.find((item) => item.status === "clarify");
+  if (!batch) {
+    els.clarifySection.hidden = true;
+    state.lastClarifyKey = "";
+    return;
+  }
+
+  const pageRange = formatPageRange(batch.startPage, batch.endPage);
+  els.clarifySection.hidden = false;
+  els.clarifyMeta.textContent = `pages ${pageRange}`;
+  els.clarifyQuestion.textContent =
+    batch.clarifyQuestion || "Gemini asked a question but did not include the text.";
+
+  const key = `${batch.startPage}-${batch.endPage}-${batch.clarifyQuestion}`;
+  if (key !== state.lastClarifyKey) {
+    state.lastClarifyKey = key;
+    els.clarifyAnswer.value = "";
+    queueMicrotask(() => els.clarifyAnswer.focus());
+  }
+}
+
 function renderDownloads() {
   const ready = completedBatches().length > 0 && !state.running;
   els.downloadDocxBtn.disabled = !ready;
@@ -222,6 +263,7 @@ function render() {
   }
   renderProgress();
   renderBatchList();
+  renderClarify();
   renderErrors();
   renderDownloads();
 }
@@ -237,6 +279,8 @@ function resetBatchesFromRanges(ranges) {
     markdown: "",
     issues: [],
     error: "",
+    clarifyQuestion: "",
+    clarifyHistory: [],
   }));
 }
 
@@ -302,6 +346,8 @@ function mergeSplitBatches(split) {
       markdown: previous?.markdown || "",
       issues: previous?.issues || [],
       error: previous?.error || "",
+      clarifyQuestion: previous?.clarifyQuestion || "",
+      clarifyHistory: previous?.clarifyHistory || [],
     };
   });
 }
@@ -346,6 +392,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
   persistApiKey();
   setAlert("");
   state.abortController = new AbortController();
+  const latexMath = Boolean(els.latexMath.checked);
   setRunning(true);
 
   try {
@@ -390,6 +437,8 @@ async function runAdaptation({ retryOnly = null } = {}) {
             pdfBytes: batch.bytes,
             proxyUrl: els.proxyUrl.value.trim(),
             signal: state.abortController.signal,
+            latexMath,
+            clarifyHistory: batch.clarifyHistory || [],
             onRetry({ waitMs, httpStatus }) {
               batch.status = "retrying";
               batch.error = "";
@@ -400,10 +449,25 @@ async function runAdaptation({ retryOnly = null } = {}) {
               render();
             },
           });
+          const clarifyQuestion = parseClarify(markdown);
+          if (clarifyQuestion !== null) {
+            batch.markdown = "";
+            batch.issues = [];
+            batch.clarifyQuestion = clarifyQuestion;
+            batch.status = "clarify";
+            batch.error = "";
+            setAlert("");
+            setStatus(
+              `Paused on pages ${pageRange}. Gemini needs a clarification before that batch can finish.`
+            );
+            render();
+            return;
+          }
           batch.markdown = markdown;
-          batch.issues = validateMarkdown(markdown, `pages-${pageRange}`);
+          batch.issues = validateMarkdown(markdown, `pages-${pageRange}`, { latexMath });
           batch.status = "done";
           batch.error = "";
+          batch.clarifyQuestion = "";
           break;
         } catch (err) {
           const outcome = applyTranscriptionError(batch, err);
@@ -456,8 +520,45 @@ function retryBatch(batch) {
   }
   batch.status = "pending";
   batch.error = "";
+  batch.clarifyQuestion = "";
+  batch.clarifyHistory = [];
   render();
   runAdaptation({ retryOnly: batch });
+}
+
+function continueClarify() {
+  if (state.running) {
+    return;
+  }
+  const batch = state.batches.find((item) => item.status === "clarify");
+  if (!batch) {
+    setAlert("There is no batch waiting for clarification.");
+    return;
+  }
+  const answer = els.clarifyAnswer.value.trim();
+  if (!answer) {
+    setAlert("Type an answer so Gemini can finish this batch.");
+    els.clarifyAnswer.focus();
+    return;
+  }
+  batch.clarifyHistory = [
+    ...(batch.clarifyHistory || []),
+    { question: batch.clarifyQuestion, answer },
+  ];
+  batch.status = "pending";
+  batch.error = "";
+  batch.clarifyQuestion = "";
+  els.clarifyAnswer.value = "";
+  setAlert("");
+  runAdaptation({ retryOnly: batch });
+}
+
+function retryClarifyFromScratch() {
+  const batch = state.batches.find((item) => item.status === "clarify");
+  if (!batch) {
+    return;
+  }
+  retryBatch(batch);
 }
 
 function cancelAdaptation() {
@@ -484,6 +585,8 @@ function bindEvents() {
     planFromLoadedPdf();
   });
   els.cancelBtn.addEventListener("click", cancelAdaptation);
+  els.clarifyContinueBtn.addEventListener("click", continueClarify);
+  els.clarifyRetryBtn.addEventListener("click", retryClarifyFromScratch);
   els.model.addEventListener("change", syncCustomModelField);
   els.apiKey.addEventListener("input", persistApiKey);
   els.rememberKey.addEventListener("change", persistApiKey);
@@ -498,7 +601,7 @@ function bindEvents() {
       return;
     }
     const hasWork = state.batches.some(
-      (batch) => batch.status === "done" || batch.status === "error"
+      (batch) => batch.status === "done" || batch.status === "error" || batch.status === "clarify"
     );
     if (!hasWork) {
       planFromLoadedPdf();

@@ -13,8 +13,8 @@
       <p class="eyebrow">Accessible textbook prep</p>
       <h1>Textbook Adapter</h1>
       <p class="lede">
-        Drop a scanned textbook PDF, paste a Gemini API key, and download accessible
-        markdown for later Grade 2 braille. The key stays in this browser session and
+        Drop a scanned textbook PDF, paste a Gemini API key, and download
+        screen-reader-accessible markdown. The key stays in this browser session and
         is sent only to Google Gemini, or to an optional proxy you set.
       </p>
     </header>
@@ -107,6 +107,15 @@
               />
             </div>
           </div>
+
+          <div class="field checkbox-field">
+            <input id="latex-math" name="latex-math" type="checkbox" />
+            <label for="latex-math">Wrap math in LaTeX (for Nemeth)</label>
+          </div>
+          <p class="hint latex-hint">
+            Off by default: math is spoken plain text. When checked, Gemini wraps
+            math in LaTeX so it can later be converted to Nemeth.
+          </p>
         </fieldset>
 
         <details class="panel advanced">
@@ -151,6 +160,25 @@
 
       <p id="form-alert" class="alert" hidden role="alert"></p>
 
+      <section id="clarify-section" class="panel" aria-labelledby="clarify-heading" hidden>
+        <h2 id="clarify-heading">Clarification needed</h2>
+        <p class="hint">
+          Gemini paused this batch. Answer the question to continue. Remaining
+          pending batches wait until this one finishes. You can also retry from
+          scratch without answering.
+        </p>
+        <p id="clarify-meta" class="file-meta"></p>
+        <p id="clarify-question" class="clarify-question"></p>
+        <div class="field">
+          <label for="clarify-answer">Your answer</label>
+          <textarea id="clarify-answer" name="clarify-answer" rows="3"></textarea>
+        </div>
+        <div class="actions clarify-actions">
+          <button id="clarify-continue-btn" type="button">Continue this batch</button>
+          <button id="clarify-retry-btn" type="button">Retry from scratch</button>
+        </div>
+      </section>
+
       <section class="panel" aria-labelledby="progress-heading">
         <h2 id="progress-heading">Progress</h2>
         <p id="status" role="status" aria-live="polite">Load a PDF to plan batches. Gemini is not called until you adapt.</p>
@@ -162,9 +190,10 @@
       <section id="error-section" class="panel" aria-labelledby="errors-heading" hidden>
         <h2 id="errors-heading">Failed batches</h2>
         <p class="hint">
-          A failed batch stops the run. Remaining pending ranges are not sent.
+          A failed batch or a clarification question stops the run. Remaining
+          pending ranges are not sent.
           Rate limits wait and retry the current batch without stopping.
-          Retry a failed row, or Adapt book to resume pending batches.
+          Retry a failed row, answer a clarification, or Adapt book to resume pending batches.
           Completed batches stay downloadable.
         </p>
         <ul id="error-list" class="error-list"></ul>
