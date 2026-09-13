@@ -28,6 +28,7 @@ from adapt_pdf import (  # noqa: E402
     describe_retryable_http_error,
     format_retrying_status,
     format_stopped_batch_error,
+    is_non_retryable_resource_exhausted,
     is_retryable_http_status,
     retry_delay_seconds,
     run_transcriptions,
@@ -135,6 +136,20 @@ class AdaptPdfRateLimitRetryTests(unittest.TestCase):
         self.assertFalse(is_retryable_http_status(401))
         self.assertGreater(RETRYABLE_MAX_RETRIES, 4)
 
+    def test_prepayment_429_is_not_retryable(self):
+        payload = {
+            "error": {
+                "message": (
+                    "Your prepayment credits are depleted. Please go to AI Studio "
+                    "at https://ai.studio/projects to manage your project and billing."
+                )
+            }
+        }
+        self.assertTrue(is_non_retryable_resource_exhausted(payload))
+        self.assertFalse(
+            is_non_retryable_resource_exhausted({"error": {"message": "RESOURCE_EXHAUSTED"}})
+        )
+
     def test_retrying_copy_vs_exhausted_copy(self):
         self.assertEqual(describe_retryable_http_error(429), RATE_LIMIT_RETRYING)
         self.assertIn("Waiting, then retrying this batch", RATE_LIMIT_RETRYING)
@@ -220,6 +235,37 @@ class AdaptPdfRateLimitRetryTests(unittest.TestCase):
             )
         self.assertEqual(str(raised.exception), RATE_LIMIT_EXHAUSTED)
         self.assertNotIn("Waiting, then retrying", str(raised.exception))
+
+    def test_prepayment_429_stops_without_retry(self):
+        calls = {"n": 0}
+
+        def depleted(request, timeout=180):
+            calls["n"] += 1
+            raise urllib.error.HTTPError(
+                "https://example.test",
+                429,
+                "Too Many Requests",
+                None,
+                io.BytesIO(
+                    b'{"error":{"message":"Your prepayment credits are depleted. Please go to AI Studio."}}'
+                ),
+            )
+
+        def do_not_sleep(_seconds):
+            raise AssertionError("should not wait on billing exhaustion")
+
+        with self.assertRaises(RuntimeError) as raised:
+            transcribe_pdf_bytes(
+                b"%PDF-fake",
+                "001-005",
+                "test-key",
+                "gemini-3.8-flash",
+                max_retries=8,
+                sleep_fn=do_not_sleep,
+                urlopen_fn=depleted,
+            )
+        self.assertIn("prepayment credits are depleted", str(raised.exception))
+        self.assertEqual(calls["n"], 1)
 
     def test_hard_400_stops_without_retry(self):
         calls = {"n": 0}

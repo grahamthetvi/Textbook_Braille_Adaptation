@@ -48,6 +48,7 @@ class ServeAdapterTests(unittest.TestCase):
         self.assertIn("How to connect Gemini 3.8 Flash", body)
         self.assertIn("gemini-3.8-flash", body)
         self.assertIn("A failed batch stops the run", body)
+        self.assertIn("Download Word document", body)
 
     def test_app_module(self):
         conn = self._conn()
