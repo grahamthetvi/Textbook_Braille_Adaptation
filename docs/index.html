@@ -35,10 +35,40 @@
               aria-describedby="api-key-hint"
             />
             <p id="api-key-hint" class="hint">
+              Create a Gemini API key in
+              <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer">Google AI Studio</a>.
               Required to adapt. Not written to disk. Session storage is used only if
               you check the box below.
             </p>
           </div>
+
+          <details class="setup-steps">
+            <summary>How to connect Gemini 3.8 Flash</summary>
+            <ol>
+              <li>
+                Open
+                <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer">Google AI Studio API keys</a>
+                and sign in with the Google account that should be billed.
+              </li>
+              <li>
+                Create an API key in a Google Cloud project. If prompted, enable the
+                <strong>Gemini API</strong> (Generative Language API) for that project.
+              </li>
+              <li>
+                Paste the key in the field above. Leave <strong>Model</strong> on
+                Gemini 3.8 Flash. The Google API id is <code>gemini-3.8-flash</code>.
+              </li>
+              <li>
+                Do not type Cursor names such as <code>gemini-3.8-flash-medium</code>
+                into Custom model. Those are not valid Google API ids.
+              </li>
+              <li>
+                If this page cannot reach Google from the browser, run
+                <code>python3 scripts/serve_adapter.py</code> and set the proxy to
+                <code>http://127.0.0.1:8000/api/gemini</code>.
+              </li>
+            </ol>
+          </details>
 
           <div class="field checkbox-field">
             <input id="remember-key" name="remember-key" type="checkbox" />
@@ -48,7 +78,10 @@
           <div class="field-row">
             <div class="field">
               <label for="model">Model</label>
-              <select id="model" name="model"></select>
+              <select id="model" name="model" aria-describedby="model-hint"></select>
+              <p id="model-hint" class="hint">
+                Use Gemini 3.8 Flash unless an older key cannot call that model.
+              </p>
             </div>
             <div class="field" id="custom-model-wrap" hidden>
               <label for="custom-model">Custom model</label>
@@ -58,7 +91,7 @@
                 type="text"
                 autocomplete="off"
                 spellcheck="false"
-                placeholder="gemini-2.5-flash"
+                placeholder="gemini-3.8-flash"
               />
             </div>
             <div class="field field-narrow">

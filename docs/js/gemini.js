@@ -3,10 +3,15 @@
 import { STYLE_RULES, buildInterpretationPrompt, pageRangeLabel } from "./prompt.js";
 import { stripModelFences } from "./validate.js";
 
-export const DEFAULT_MODEL = "gemini-2.5-flash";
+/** Google Gemini API model id. Do not use Cursor slugs such as gemini-3.8-flash-medium. */
+export const DEFAULT_MODEL = "gemini-3.8-flash";
+
+/** Matches Google's default thinking level for 3.8 Flash; enough for faithful OCR. */
+export const GEMINI_3_THINKING_LEVEL = "medium";
 
 export const MODEL_OPTIONS = [
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (recommended)" },
+  { value: "gemini-3.8-flash", label: "Gemini 3.8 Flash (recommended)" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
   { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
   { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
 ];
@@ -27,9 +32,25 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export function usesGemini3Thinking(model) {
+  return /^gemini-3(\.|-)/i.test(String(model || "").trim());
+}
+
+export function buildGenerationConfig(model) {
+  if (usesGemini3Thinking(model)) {
+    return {
+      thinkingConfig: {
+        thinkingLevel: GEMINI_3_THINKING_LEVEL,
+      },
+    };
+  }
+  return { temperature: 0.2 };
+}
+
 export function extractText(payload) {
   const parts = payload?.candidates?.[0]?.content?.parts || [];
   return parts
+    .filter((part) => !part.thought)
     .map((part) => part.text || "")
     .join("\n")
     .trim();
@@ -77,9 +98,7 @@ export async function transcribeBatch({
         ],
       },
     ],
-    generationConfig: {
-      temperature: 0.2,
-    },
+    generationConfig: buildGenerationConfig(model),
   };
 
   const trimmedProxy = (proxyUrl || "").trim().replace(/\/$/, "");

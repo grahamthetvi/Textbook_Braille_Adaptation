@@ -17,11 +17,12 @@ Open `http://127.0.0.1:8000`. Optional proxy URL on the page: `http://127.0.0.1:
 
 ## User steps
 
-1. Paste a Gemini API key from Google AI Studio.
-2. Drop a textbook PDF.
-3. Plan batches (5–8 pages).
-4. Adapt book.
-5. Download combined markdown or a zip.
+1. Create a Gemini API key in Google AI Studio (https://aistudio.google.com/apikey).
+2. Paste it on the page. Leave the model on Gemini 3.8 Flash (`gemini-3.8-flash`, not Cursor slugs).
+3. Drop a textbook PDF.
+4. Plan batches (5–8 pages).
+5. Adapt book.
+6. Download combined markdown or a zip.
 
 ## CLI
 

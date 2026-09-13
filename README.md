@@ -2,7 +2,31 @@
 
 Turn scanned textbook PDFs into accessible markdown for later Grade 2 braille translation. This app transcribes pages; it does not produce braille.
 
-The primary path is a static web app: paste a Gemini API key, drop a PDF, split it into 5–8 page batches in the browser, send each batch to Gemini, and download markdown.
+The primary path is a static web app: paste a Gemini API key, drop a PDF, split it into 5–8 page batches in the browser, send each batch to Gemini 3.8 Flash, and download markdown.
+
+## Connect Gemini 3.8 Flash
+
+This site calls the **Google Gemini API**, not Cursor’s model picker. The model id is `gemini-3.8-flash`. Do not use Cursor slugs such as `gemini-3.8-flash-medium` or `gemini-3.8-flash-high`.
+
+1. Open [Google AI Studio API keys](https://aistudio.google.com/apikey) and sign in.
+2. Create an API key in a Google Cloud project. If Google asks, enable the **Gemini API** (Generative Language API) for that project.
+3. Confirm the key can use Gemini 3.8 Flash (GA). Older keys or projects that only allow 2.x models will fail until 3.8 is available on that project.
+4. Serve the site (`python3 scripts/serve_adapter.py`) or open the GitHub Pages URL after deploy.
+5. Paste the key into **Gemini API key**. Leave **Model** on Gemini 3.8 Flash.
+6. Drop a PDF, plan batches, then Adapt book.
+
+The key stays in the browser session. It is sent only to Google (`generativelanguage.googleapis.com`), or to an optional same-origin proxy. Vertex AI / Gemini Enterprise OAuth tokens are not supported here.
+
+If the browser blocks Google (common on some locked-down networks), run the local server and set **Advanced: optional proxy URL** to `http://127.0.0.1:8000/api/gemini`.
+
+CLI equivalent:
+
+```bash
+python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --out-dir accessible
+python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --model gemini-3.8-flash
+```
+
+The page vendors [pdf-lib](https://github.com/Hopding/pdf-lib) and [JSZip](https://github.com/Stuk/jszip) in `docs/vendor/`.
 
 ## Web app
 
@@ -18,13 +42,11 @@ After you merge to `main` and enable GitHub Pages, the same app is also at:
 
 https://grahamthetvi.github.io/Textbook_Braille_Adaptation/
 
-1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+1. Paste the Gemini API key from the steps above.
 2. Drop a PDF on the page.
 3. Plan batches (5–8 pages each).
 4. Adapt book.
 5. Download the markdown (single file or zip).
-
-The key stays in your browser session. It is sent only to Google, or to an optional proxy if you set one (for example `http://127.0.0.1:8000/api/gemini` when using the local server). The page vendors [pdf-lib](https://github.com/Hopding/pdf-lib) and [JSZip](https://github.com/Stuk/jszip) in `docs/vendor/`.
 
 ### Enable GitHub Pages
 
@@ -85,6 +107,6 @@ Accessible files follow `.cursor/rules/accessible-document-style.mdc`:
 
 ## What you still need
 
-- A Gemini API key from Google AI Studio for the web app or CLI.
+- A Gemini API key from Google AI Studio that can call `gemini-3.8-flash`.
 - Human review of math, diagrams, and `[unclear]` markers before braille translation.
 - GitHub Pages enabled if you want the public site URL after merge.

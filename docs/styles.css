@@ -124,6 +124,27 @@ summary {
   padding-top: 0.85rem;
 }
 
+.setup-steps {
+  margin: 0 0 1rem;
+}
+
+.setup-steps ol {
+  margin: 0.65rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.setup-steps li {
+  margin-bottom: 0.45rem;
+}
+
+.setup-steps li:last-child {
+  margin-bottom: 0;
+}
+
+.setup-steps code {
+  font-size: 0.88em;
+}
+
 .field {
   display: flex;
   flex-direction: column;
