@@ -49,3 +49,36 @@ export async function splitPdfBytes(sourceBytes, preferredBatchSize = 6) {
 
   return { pageCount, batches };
 }
+
+/**
+ * Split a PDF into one-page PDFs for on-screen review.
+ * If `pdfBytes` is already the batch (page count matches the range), page 1
+ * of that file is `startPage`. Otherwise pages are taken from the full source.
+ */
+export async function extractPagePdfs(pdfBytes, startPage, endPage) {
+  const lib = requirePdfLib();
+  const source = await lib.PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const count = source.getPageCount();
+  const expected = endPage - startPage + 1;
+  if (expected < 1) {
+    throw new Error("Page range is empty.");
+  }
+  const isBatchSubset = count === expected;
+  const pages = [];
+
+  for (let offset = 0; offset < expected; offset += 1) {
+    const sourceIndex = isBatchSubset ? offset : startPage - 1 + offset;
+    if (sourceIndex < 0 || sourceIndex >= count) {
+      throw new Error(`Page ${startPage + offset} is missing from the source PDF.`);
+    }
+    const pageDoc = await lib.PDFDocument.create();
+    const [copied] = await pageDoc.copyPages(source, [sourceIndex]);
+    pageDoc.addPage(copied);
+    pages.push({
+      pageNumber: startPage + offset,
+      bytes: await pageDoc.save(),
+    });
+  }
+
+  return pages;
+}
