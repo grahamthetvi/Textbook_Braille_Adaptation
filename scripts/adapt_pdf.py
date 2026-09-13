@@ -72,8 +72,15 @@ def build_generation_config(model: str) -> dict:
     return {"temperature": 0.2}
 
 
+REMAINING_NOT_SENT = "Remaining batches were not sent because of this failure."
+
+
 def _page_range(start: int, end: int) -> str:
     return f"{start:03d}-{end:03d}"
+
+
+def format_stopped_batch_error(page_range: str, error: str) -> str:
+    return f"Batch pages {page_range} failed: {error}\n{REMAINING_NOT_SENT}"
 
 
 def _extract_text(payload: dict) -> str:
@@ -183,6 +190,56 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def run_transcriptions(
+    batches,
+    *,
+    key: str,
+    model: str,
+    out_dir: Path,
+    skip_existing: bool = False,
+    max_batches: int = 0,
+    transcribe_fn=None,
+    log=None,
+    err_log=None,
+) -> int:
+    """Transcribe batches sequentially. Stop on the first failure."""
+    if transcribe_fn is None:
+        transcribe_fn = transcribe_pdf_bytes
+    if log is None:
+
+        def log(message: str) -> None:
+            print(message, flush=True)
+
+    if err_log is None:
+
+        def err_log(message: str) -> None:
+            print(message, file=sys.stderr, flush=True)
+
+    transcribed = 0
+    skipped = 0
+    for batch in batches:
+        label = _page_range(batch.start_page, batch.end_page)
+        out_path = out_dir / f"{batch.output_stem}.md"
+        if skip_existing and out_path.exists():
+            log(f"Skipping {label} (already at {out_path})")
+            skipped += 1
+            continue
+        if max_batches and transcribed >= max_batches:
+            log(f"Stopping after {transcribed} new batch(es) (--max-batches)")
+            break
+        log(f"Transcribing {label} ({batch.page_count} pages)...")
+        try:
+            text = transcribe_fn(batch.batch_pdf.read_bytes(), label, key, model)
+        except Exception as err:
+            err_log(format_stopped_batch_error(label, str(err)))
+            return 1
+        out_path.write_text(text.rstrip() + "\n", encoding="utf-8")
+        transcribed += 1
+        log(f"  wrote {out_path}")
+    log(f"Done: {transcribed} new file(s), {skipped} skipped, in {out_dir}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if not args.key:
@@ -195,29 +252,14 @@ def main(argv: list[str] | None = None) -> int:
     args.out_dir.mkdir(parents=True, exist_ok=True)
     batches = split_pdf(args.pdf, preferred_batch_size=args.preferred)
     print(f"Split {args.pdf.name} into {len(batches)} batches", flush=True)
-    transcribed = 0
-    skipped = 0
-    try:
-        for batch in batches:
-            label = _page_range(batch.start_page, batch.end_page)
-            out_path = args.out_dir / f"{batch.output_stem}.md"
-            if args.skip_existing and out_path.exists():
-                print(f"Skipping {label} (already at {out_path})", flush=True)
-                skipped += 1
-                continue
-            if args.max_batches and transcribed >= args.max_batches:
-                print(f"Stopping after {transcribed} new batch(es) (--max-batches)")
-                break
-            print(f"Transcribing {label} ({batch.page_count} pages)...", flush=True)
-            text = transcribe_pdf_bytes(batch.batch_pdf.read_bytes(), label, args.key, args.model)
-            out_path.write_text(text.rstrip() + "\n", encoding="utf-8")
-            transcribed += 1
-            print(f"  wrote {out_path}", flush=True)
-    except RuntimeError as err:
-        print(f"Adaptation stopped: {err}", file=sys.stderr)
-        return 1
-    print(f"Done: {transcribed} new file(s), {skipped} skipped, in {args.out_dir}")
-    return 0
+    return run_transcriptions(
+        batches,
+        key=args.key,
+        model=args.model,
+        out_dir=args.out_dir,
+        skip_existing=args.skip_existing,
+        max_batches=args.max_batches,
+    )
 
 
 if __name__ == "__main__":

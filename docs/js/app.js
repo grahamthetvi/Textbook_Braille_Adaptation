@@ -7,7 +7,8 @@ import { splitPdfBytes, inspectPdf } from "./pdf-split.js";
 import { transcribeBatch, MODEL_OPTIONS, DEFAULT_MODEL } from "./gemini.js";
 import { validateMarkdown } from "./validate.js";
 import { downloadCombined, downloadZip } from "./download.js";
-import { planBatches, padPage } from "./batches.js";
+import { planBatches } from "./batches.js";
+import { applyTranscriptionError, formatPageRange } from "./run-control.js";
 
 const SESSION_KEY = "textbook-adapter-api-key";
 const CUSTOM_MODEL_VALUE = "__custom__";
@@ -49,10 +50,6 @@ function cacheElements() {
   els.downloadZipBtn = document.getElementById("download-zip-btn");
 }
 
-function padRange(startPage, endPage) {
-  return `${padPage(startPage)}-${padPage(endPage)}`;
-}
-
 function getPreferredBatchSize() {
   const value = Number(els.batchSize.value);
   const size = Number.isFinite(value) ? Math.round(value) : 6;
@@ -82,11 +79,6 @@ function setAlert(message) {
   }
   els.formAlert.hidden = false;
   els.formAlert.textContent = message;
-}
-
-function isAuthError(err) {
-  const message = String(err?.message || "");
-  return /API[_ ]?key/i.test(message) || /PERMISSION_DENIED/i.test(message) || /\b(401|403)\b/.test(message);
 }
 
 function completedBatches() {
@@ -170,7 +162,7 @@ function renderBatchList() {
 
     const range = document.createElement("span");
     range.className = "batch-range";
-    range.textContent = `pages ${padRange(batch.startPage, batch.endPage)}`;
+    range.textContent = `pages ${formatPageRange(batch.startPage, batch.endPage)}`;
 
     const status = document.createElement("span");
     status.className = "batch-status";
@@ -200,7 +192,7 @@ function renderErrors() {
     item.className = "error-item";
 
     const text = document.createElement("p");
-    text.textContent = `pages ${padRange(batch.startPage, batch.endPage)}: ${batch.error || "This batch failed."}`;
+    text.textContent = `pages ${formatPageRange(batch.startPage, batch.endPage)}: ${batch.error || "This batch failed."}`;
 
     const retry = document.createElement("button");
     retry.type = "button";
@@ -381,7 +373,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
 
       batch.status = "running";
       batch.error = "";
-      setStatus(`Batch ${index + 1} of ${total}: pages ${padRange(batch.startPage, batch.endPage)}`);
+      setStatus(`Batch ${index + 1} of ${total}: pages ${formatPageRange(batch.startPage, batch.endPage)}`);
       render();
 
       try {
@@ -395,28 +387,23 @@ async function runAdaptation({ retryOnly = null } = {}) {
           signal: state.abortController.signal,
         });
         batch.markdown = markdown;
-        batch.issues = validateMarkdown(markdown, `pages-${padRange(batch.startPage, batch.endPage)}`);
+        batch.issues = validateMarkdown(markdown, `pages-${formatPageRange(batch.startPage, batch.endPage)}`);
         batch.status = "done";
         batch.error = "";
       } catch (err) {
-        if (err?.name === "AbortError") {
-          batch.status = "pending";
-          setStatus("Cancelled. Completed batches are still available to download.");
+        const outcome = applyTranscriptionError(batch, err);
+        batch.status = outcome.batchStatus;
+        batch.error = outcome.error;
+        if (outcome.kind === "cancel") {
+          setAlert("");
+          setStatus(outcome.statusMessage);
           render();
           return;
         }
-
-        batch.status = "error";
-        batch.error = err?.message || "This batch failed.";
-
-        if (isAuthError(err)) {
-          setAlert(
-            `${batch.error} Remaining batches were not sent so a bad key would not burn extra calls.`
-          );
-          setStatus("Stopped after an API key error. Fix the key, then adapt again.");
-          render();
-          return;
-        }
+        setAlert(outcome.alertMessage);
+        setStatus(outcome.statusMessage);
+        render();
+        return;
       }
       render();
     }
