@@ -21,4 +21,4 @@ jobs:
       - name: Python tests
         run: python3 -m unittest discover -s tests -p 'test_*.py'
       - name: JavaScript tests
-        run: node --test tests/test_js_batches.mjs tests/test_js_validate.mjs tests/test_js_gemini.mjs
+        run: node --test tests/test_js_batches.mjs tests/test_js_validate.mjs tests/test_js_gemini.mjs tests/test_js_run_control.mjs

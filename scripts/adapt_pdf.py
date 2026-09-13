@@ -199,18 +199,21 @@ def run_transcriptions(
     skip_existing: bool = False,
     max_batches: int = 0,
     transcribe_fn=None,
-    log=print,
+    log=None,
     err_log=None,
 ) -> int:
     """Transcribe batches sequentially. Stop on the first failure."""
     if transcribe_fn is None:
         transcribe_fn = transcribe_pdf_bytes
+    if log is None:
+
+        def log(message: str) -> None:
+            print(message, flush=True)
+
     if err_log is None:
 
-        def _default_err_log(message: str) -> None:
-            print(message, file=sys.stderr)
-
-        err_log = _default_err_log
+        def err_log(message: str) -> None:
+            print(message, file=sys.stderr, flush=True)
 
     transcribed = 0
     skipped = 0
