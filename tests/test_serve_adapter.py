@@ -47,6 +47,7 @@ class ServeAdapterTests(unittest.TestCase):
         self.assertIn("js/app.js", body)
         self.assertIn("How to connect Gemini 3.8 Flash", body)
         self.assertIn("gemini-3.8-flash", body)
+        self.assertIn("A failed batch stops the run", body)
 
     def test_app_module(self):
         conn = self._conn()
@@ -56,6 +57,7 @@ class ServeAdapterTests(unittest.TestCase):
         conn.close()
         self.assertEqual(response.status, 200)
         self.assertIn("runAdaptation", body)
+        self.assertIn("applyTranscriptionError", body)
 
     def test_proxy_requires_api_key(self):
         conn = self._conn()

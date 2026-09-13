@@ -161,7 +161,11 @@
 
       <section id="error-section" class="panel" aria-labelledby="errors-heading" hidden>
         <h2 id="errors-heading">Failed batches</h2>
-        <p class="hint">Each failed range can be retried without re-sending batches that already succeeded.</p>
+        <p class="hint">
+          A failed batch stops the run. Remaining pending ranges are not sent.
+          Retry the failed row, or Adapt book to resume pending batches.
+          Completed batches stay downloadable.
+        </p>
         <ul id="error-list" class="error-list"></ul>
       </section>
 
