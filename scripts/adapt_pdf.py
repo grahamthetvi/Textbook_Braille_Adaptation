@@ -7,6 +7,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -20,7 +21,8 @@ if str(SCRIPT_DIR) not in sys.path:
 from config import ACCESSIBLE_DIR, INTERPRETATION_PROMPT
 from split_pdf import split_pdf
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.8-flash"
+GEMINI_3_THINKING_LEVEL = "medium"
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 # Keep in lockstep with docs/js/prompt.js STYLE_RULES.
 STYLE_REMINDER = """Accessible Document Style
@@ -60,6 +62,16 @@ Use the token [unclear] for a word that cannot be read. Do not guess a word that
 """
 
 
+def uses_gemini_3_thinking(model: str) -> bool:
+    return bool(re.match(r"^gemini-3(\.|-)", (model or "").strip(), flags=re.I))
+
+
+def build_generation_config(model: str) -> dict:
+    if uses_gemini_3_thinking(model):
+        return {"thinkingConfig": {"thinkingLevel": GEMINI_3_THINKING_LEVEL}}
+    return {"temperature": 0.2}
+
+
 def _page_range(start: int, end: int) -> str:
     return f"{start:03d}-{end:03d}"
 
@@ -67,7 +79,9 @@ def _page_range(start: int, end: int) -> str:
 def _extract_text(payload: dict) -> str:
     candidates = payload.get("candidates") or [{}]
     parts = (candidates[0].get("content") or {}).get("parts") or []
-    return "\n".join(part.get("text") or "" for part in parts).strip()
+    return "\n".join(
+        part.get("text") or "" for part in parts if not part.get("thought")
+    ).strip()
 
 
 def _strip_fences(text: str) -> str:
@@ -103,7 +117,7 @@ def transcribe_pdf_bytes(
                 ]
             }
         ],
-        "generationConfig": {"temperature": 0.2},
+        "generationConfig": build_generation_config(model),
     }
     url = f"{API_ROOT}/models/{model}:generateContent?key={api_key}"
     raw = json.dumps(body).encode("utf-8")
@@ -149,7 +163,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Gemini API key (or set GEMINI_API_KEY)",
     )
     parser.add_argument("--out-dir", type=Path, default=ACCESSIBLE_DIR)
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help="Google Gemini API model id (default gemini-3.8-flash)",
+    )
     parser.add_argument("--preferred", type=int, default=6, help="Preferred batch size (5-8)")
     parser.add_argument(
         "--skip-existing",

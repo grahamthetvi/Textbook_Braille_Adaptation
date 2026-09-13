@@ -45,6 +45,8 @@ class ServeAdapterTests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         self.assertIn("Textbook Adapter", body)
         self.assertIn("js/app.js", body)
+        self.assertIn("How to connect Gemini 3.8 Flash", body)
+        self.assertIn("gemini-3.8-flash", body)
 
     def test_app_module(self):
         conn = self._conn()
@@ -60,7 +62,7 @@ class ServeAdapterTests(unittest.TestCase):
         payload = json.dumps({"contents": []}).encode("utf-8")
         conn.request(
             "POST",
-            "/api/gemini/models/gemini-2.5-flash:generateContent",
+            "/api/gemini/models/gemini-3.8-flash:generateContent",
             body=payload,
             headers={"Content-Type": "application/json"},
         )
