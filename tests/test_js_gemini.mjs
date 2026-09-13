@@ -10,6 +10,7 @@ import {
   buildGenerationConfig,
   describeGeminiError,
   extractText,
+  isNonRetryableResourceExhausted,
   isRetryableHttpStatus,
   retryDelayMs,
   transcribeBatch,
@@ -159,6 +160,47 @@ test("exhausted 429 throws honest copy and is not retryable", async () => {
       return true;
     }
   );
+});
+
+test("prepayment 429 is not treated as a retryable rate limit", () => {
+  const payload = {
+    error: {
+      message:
+        "Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing.",
+    },
+  };
+  assert.equal(isNonRetryableResourceExhausted(payload), true);
+  assert.match(describeGeminiError(payload, 429), /prepayment credits are depleted/i);
+  assert.equal(isNonRetryableResourceExhausted({ error: { message: "RESOURCE_EXHAUSTED" } }), false);
+  assert.equal(describeGeminiError({ error: { message: "RESOURCE_EXHAUSTED" } }, 429), RATE_LIMIT_RETRYING);
+});
+
+test("prepayment 429 throws immediately without retrying", async () => {
+  let calls = 0;
+  await assert.rejects(
+    () =>
+      transcribeBatch({
+        apiKey: "test-key",
+        startPage: 1,
+        endPage: 5,
+        pdfBytes: new Uint8Array([1, 2, 3, 4]),
+        maxRetries: 8,
+        fetchImpl: async () => {
+          calls += 1;
+          return jsonResponse(429, {
+            error: {
+              message:
+                "Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing.",
+            },
+          });
+        },
+        sleepFn: async () => {
+          throw new Error("should not wait on billing exhaustion");
+        },
+      }),
+    /prepayment credits are depleted/
+  );
+  assert.equal(calls, 1);
 });
 
 test("hard 400 errors throw immediately without retrying", async () => {

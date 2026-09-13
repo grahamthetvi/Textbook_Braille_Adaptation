@@ -281,6 +281,7 @@ button {
 }
 
 button[type="submit"],
+#download-docx-btn,
 #download-md-btn {
   background: var(--accent);
   border-color: var(--accent-ink);

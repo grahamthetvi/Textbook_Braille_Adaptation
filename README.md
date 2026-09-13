@@ -46,7 +46,7 @@ https://grahamthetvi.github.io/Textbook_Braille_Adaptation/
 2. Drop a PDF on the page.
 3. Plan batches (5–8 pages each).
 4. Adapt book.
-5. Download the markdown (single file or zip).
+5. Download a Word document, combined markdown, or a zip of per-batch files.
 
 ### Enable GitHub Pages
 

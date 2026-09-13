@@ -85,6 +85,18 @@ export function isRetryableHttpStatus(status) {
   return status === 429 || status === 503;
 }
 
+/** Billing/quota 429s will not recover by waiting; do not treat them as RPM limits. */
+export function isNonRetryableResourceExhausted(payload) {
+  const message = String(payload?.error?.message || "");
+  if (/prepayment credits are depleted/i.test(message)) {
+    return true;
+  }
+  if (/billing/i.test(message) && /ai\.studio|ai studio/i.test(message)) {
+    return true;
+  }
+  return /quota/i.test(message) && /limit:\s*0/i.test(message);
+}
+
 export function retryDelayMs(attempt, { baseMs = RETRY_BASE_MS, capMs = RETRY_CAP_MS } = {}) {
   const n = Math.max(0, Number(attempt) || 0);
   return Math.min(capMs, baseMs * 2 ** n);
@@ -100,6 +112,9 @@ export function geminiError(message, { retryable = false, httpStatus = 0 } = {})
 export function describeGeminiError(payload, status, options = {}) {
   const exhausted = Boolean(options?.exhausted);
   const message = payload?.error?.message || payload?.error?.status || "";
+  if (status === 429 && isNonRetryableResourceExhausted(payload)) {
+    return message.trim() || RATE_LIMIT_EXHAUSTED;
+  }
   if (status === 429) {
     return exhausted ? RATE_LIMIT_EXHAUSTED : RATE_LIMIT_RETRYING;
   }
@@ -194,7 +209,10 @@ export async function transcribeBatch({
     }
 
     const payload = await response.json().catch(() => ({}));
-    if (isRetryableHttpStatus(response.status)) {
+    if (
+      isRetryableHttpStatus(response.status) &&
+      !isNonRetryableResourceExhausted(payload)
+    ) {
       const willRetry = attempt < maxRetries;
       const message = describeGeminiError(payload, response.status, { exhausted: !willRetry });
       lastError = geminiError(message, {

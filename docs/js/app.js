@@ -6,7 +6,7 @@
 import { splitPdfBytes, inspectPdf } from "./pdf-split.js";
 import { transcribeBatch, MODEL_OPTIONS, DEFAULT_MODEL } from "./gemini.js";
 import { validateMarkdown } from "./validate.js";
-import { downloadCombined, downloadZip } from "./download.js";
+import { downloadCombined, downloadDocx, downloadZip } from "./download.js";
 import { planBatches } from "./batches.js";
 import { applyTranscriptionError, formatPageRange, formatRetryingStatus } from "./run-control.js";
 
@@ -46,6 +46,7 @@ function cacheElements() {
   els.batchList = document.getElementById("batch-list");
   els.errorSection = document.getElementById("error-section");
   els.errorList = document.getElementById("error-list");
+  els.downloadDocxBtn = document.getElementById("download-docx-btn");
   els.downloadMdBtn = document.getElementById("download-md-btn");
   els.downloadZipBtn = document.getElementById("download-zip-btn");
 }
@@ -207,6 +208,7 @@ function renderErrors() {
 
 function renderDownloads() {
   const ready = completedBatches().length > 0 && !state.running;
+  els.downloadDocxBtn.disabled = !ready;
   els.downloadMdBtn.disabled = !ready;
   els.downloadZipBtn.disabled = !ready;
 }
@@ -521,6 +523,12 @@ function bindEvents() {
   });
   els.dropZone.addEventListener("drop", onDrop);
 
+  els.downloadDocxBtn.addEventListener("click", async () => {
+    const results = completedBatches();
+    if (results.length) {
+      await downloadDocx(results, state.fileName || "textbook.pdf");
+    }
+  });
   els.downloadMdBtn.addEventListener("click", () => {
     const results = completedBatches();
     if (results.length) {

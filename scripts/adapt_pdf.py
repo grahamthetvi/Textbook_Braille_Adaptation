@@ -96,6 +96,17 @@ def is_retryable_http_status(status: int) -> bool:
     return status in (429, 503)
 
 
+def is_non_retryable_resource_exhausted(payload: dict | None) -> bool:
+    message = str(((payload or {}).get("error") or {}).get("message") or "")
+    if re.search(r"prepayment credits are depleted", message, flags=re.I):
+        return True
+    if re.search(r"billing", message, flags=re.I) and re.search(
+        r"ai\.studio|ai studio", message, flags=re.I
+    ):
+        return True
+    return bool(re.search(r"quota", message, flags=re.I) and re.search(r"limit:\s*0", message, flags=re.I))
+
+
 def retry_delay_seconds(attempt: int, cap: int = RETRY_CAP_SECONDS) -> int:
     n = max(0, int(attempt))
     return min(cap, 2**n)
@@ -182,7 +193,9 @@ def transcribe_pdf_bytes(
             except json.JSONDecodeError:
                 payload = {}
             message = (payload.get("error") or {}).get("message") or f"HTTP {err.code}"
-            if is_retryable_http_status(err.code):
+            if is_retryable_http_status(err.code) and not is_non_retryable_resource_exhausted(
+                payload
+            ):
                 will_retry = attempt < max_retries
                 last_error = RuntimeError(
                     describe_retryable_http_error(err.code, exhausted=not will_retry)
