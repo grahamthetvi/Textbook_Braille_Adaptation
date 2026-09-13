@@ -18,48 +18,98 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from config import ACCESSIBLE_DIR, INTERPRETATION_PROMPT
+from config import ACCESSIBLE_DIR
 from split_pdf import split_pdf
 
 DEFAULT_MODEL = "gemini-3.8-flash"
 GEMINI_3_THINKING_LEVEL = "medium"
 API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
-# Keep in lockstep with docs/js/prompt.js STYLE_RULES.
-STYLE_REMINDER = """Accessible Document Style
+# Keep STYLE_REMINDER, PLAIN_MATH_INSTRUCTION, and LATEX_MATH_INSTRUCTION
+# in lockstep with docs/js/prompt.js.
+STYLE_REMINDER = """Role: Produce screen-reader-accessible text from scanned textbook pages. Do not output braille, contractions, or braille ASCII. Transcribe faithfully. Do not change lesson content.
 
-Write plain prose for later Grade 2 braille. Transcribe faithfully — do not change lesson content.
+When stuck
+If you cannot reliably make the content accessible (illegible text, ambiguous layout, a diagram the lesson depends on, or uncertain math), do not guess. Ask one short specific question. If several issues, ask the most blocking one first. Return only the following block, with no transcription before or after it:
 
-Paragraphs and headings
-Preserve the book's intended paragraphs. Do not merge unrelated blocks or split one thought across files.
-Apply titles with heading levels that match the book's hierarchy.
-Do not use markdown hash headings such as a leading number-sign on a title unless the book itself prints that character.
+CLARIFY:
+<one question>
+
+After the user answers, transcribe the batch. If you still cannot, return only another CLARIFY block.
+
+Formatting
+Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines.
+Nested and indented lists are allowed. Number or letter questions when they sit under a numbered item.
+Avoid square brackets, braces, asterisk, and number-sign unless those characters appear in the source. Do not use markdown hash headings. Write headings as plain title lines matching the book's hierarchy.
+Default math: plain text only. Write plus, minus, times, divided by, equals, and spoken-friendly fractions. Do not use LaTeX unless math-LaTeX mode is on.
+Use simple markdown pipe tables when the book shows tabular data. Do not insert a header-separator row of hyphens; three hyphens on their own line are a section break, not a table rule.
 Use labels such as Tip: Note: FYI: Directions: Examples Caption: on their own lines when the book prints them that way.
-
-Numbers, dates, and phones
-Use comma grouping for multi-digit quantities when it aids comprehension, for example 1,000 students.
-Write dates and phone numbers with hyphen separators, for example March-4-2026 or 555-123-4567.
-
-Lists and tables
-Tables, numbered lists, lettered lists, and bullet points are allowed.
-Do not nest numbered lists. Do not nest lettered lists.
-Flatten nested practice — renumber or reletter at one level only.
-Use a bullet character or 1. 2. 3. at a single level.
-Use simple markdown tables when the book shows tabular data.
-
-Transcriber notes
-Use a separate paragraph to describe something visual on the page when it cannot be converted accessibly.
-If a caption already describes the image, convert the caption and skip an extra note.
-When the lesson depends on unseen layout, write: Transcriber note: followed by a short description.
-
-Symbols to avoid
-Avoid square brackets, the number-sign, ampersand, and asterisk unless those characters appear explicitly in the source text.
-Write "and" not an ampersand.
-Use a section break as three hyphens on its own line.
-Possessive apostrophes, hyphens, dashes, and quotation marks are allowed when the book uses them.
-
-Unreadable words
-Use the token [unclear] for a word that cannot be read. Do not guess a word that would change the lesson.
+Transcriber notes only when a visual cannot be converted accessibly. If a caption already describes the image, convert the caption and skip an extra note. Otherwise write Transcriber note: followed by a short description.
+Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
+Unreadable word: write (unclear). Do not guess a word that would change the lesson. Do not wrap it in square brackets.
+Comma-group multi-digit numbers when it aids comprehension, for example 1,000 students. Write dates and phone numbers with hyphen separators, for example March-4-2026 or 555-123-4567.
+Write "and" not an ampersand unless the ampersand appears in the source.
+Skip decorative word clouds unless specific words are required for the lesson. Transcribe the book title, edition, and copyright block on a cover when printed as normal text. When a page has no readable lesson content, write: Transcriber note: A decorative word cloud fills the cover; no lesson text is present.
+Keep the full URL on one line when the book prints it that way. You may introduce it plainly, for example Permissions website: followed by the URL.
+Output markdown or plain text only when completing a batch. No preamble, no code fences.
 """
+
+PLAIN_MATH_INSTRUCTION = (
+    "Represent math in plain text only (plus, minus, times, divided by, equals, "
+    "spoken-friendly fractions). Do not use LaTeX."
+)
+LATEX_MATH_INSTRUCTION = (
+    "Math LaTeX mode is on. Wrap every mathematical expression, equation, and "
+    "arithmetic operation in LaTeX notation: \\(...\\) for inline math and "
+    "$$...$$ for display equations. Leave all non-math prose unchanged. Braces "
+    "used inside LaTeX math spans are allowed. Still avoid asterisk, number-sign, "
+    "and square brackets unless they appear in the source."
+)
+
+
+def build_style_rules(latex_math: bool = False) -> str:
+    if not latex_math:
+        return STYLE_REMINDER
+    return f"{STYLE_REMINDER}\n{LATEX_MATH_INSTRUCTION}\n"
+
+
+def build_interpretation_prompt(page_range: str, *, latex_math: bool = False) -> str:
+    math_line = LATEX_MATH_INSTRUCTION if latex_math else PLAIN_MATH_INSTRUCTION
+    return (
+        "Produce screen-reader-accessible text from these scanned textbook pages. "
+        "Do not output braille, contractions, or braille ASCII.\n"
+        "\n"
+        "Follow the system instruction. Transcribe faithfully. If you cannot reliably "
+        "make the content accessible, return only a CLARIFY block. Nested lists are "
+        "allowed. Number or letter questions when they sit under a numbered item. Use "
+        "paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. "
+        "Avoid square brackets, braces, asterisk, and number-sign unless they appear "
+        "in the source. Do not use markdown hash headings. Use (unclear) for unreadable "
+        "words. Strip running headers, footers, and lone page numbers. Rejoin "
+        "line-break hyphens. Read columns in order.\n"
+        "\n"
+        f"{math_line}\n"
+        "\n"
+        "Output markdown or plain text only when completing the batch. No preamble, no "
+        "code fences.\n"
+        f"Source pages in this batch: {page_range}."
+    )
+
+
+def parse_clarify(text: str) -> str | None:
+    trimmed = (text or "").strip()
+    match = re.match(r"^CLARIFY:\s*([\s\S]*)$", trimmed, flags=re.I)
+    if not match:
+        return None
+    return match.group(1).strip()
+
+
+def format_clarify_needed(page_range: str, question: str) -> str:
+    asked = question or "(no question text)"
+    return (
+        f"Gemini asked for clarification on pages {page_range}. "
+        "The CLI has no chat; use the web adapter to answer, or retry after "
+        f"inspecting the pages. Question: {asked}"
+    )
 
 
 def uses_gemini_3_thinking(model: str) -> bool:
@@ -151,15 +201,17 @@ def transcribe_pdf_bytes(
     model: str,
     max_retries: int = RETRYABLE_MAX_RETRIES,
     *,
+    latex_math: bool = False,
     sleep_fn=time.sleep,
     on_retry=None,
     urlopen_fn=None,
 ) -> str:
-    prompt = INTERPRETATION_PROMPT.format(page_range=page_range)
+    prompt = build_interpretation_prompt(page_range, latex_math=latex_math)
     body = {
-        "system_instruction": {"parts": [{"text": STYLE_REMINDER}]},
+        "system_instruction": {"parts": [{"text": build_style_rules(latex_math)}]},
         "contents": [
             {
+                "role": "user",
                 "parts": [
                     {
                         "inline_data": {
@@ -167,7 +219,7 @@ def transcribe_pdf_bytes(
                             "data": base64.b64encode(pdf_bytes).decode("ascii"),
                         }
                     },
-                    {"text": f"{prompt}\nNo code fences."},
+                    {"text": prompt},
                 ]
             }
         ],
@@ -227,6 +279,9 @@ def transcribe_pdf_bytes(
         text = _strip_fences(_extract_text(payload))
         if not text:
             raise RuntimeError("Gemini returned empty text for this batch.")
+        question = parse_clarify(text)
+        if question is not None:
+            raise RuntimeError(format_clarify_needed(page_range, question))
         return text
     raise last_error or RuntimeError("Gemini request failed after retries.")
 
@@ -257,6 +312,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=0,
         help="Stop after N new transcriptions (0 means no limit)",
     )
+    parser.add_argument(
+        "--latex-math",
+        action="store_true",
+        help="Wrap math in LaTeX for later Nemeth (inline \\(...\\), display $$...$$)",
+    )
     return parser.parse_args(argv)
 
 
@@ -268,6 +328,7 @@ def run_transcriptions(
     out_dir: Path,
     skip_existing: bool = False,
     max_batches: int = 0,
+    latex_math: bool = False,
     transcribe_fn=None,
     log=None,
     err_log=None,
@@ -290,7 +351,12 @@ def run_transcriptions(
                 log(f"  {info['message']}")
 
             return transcribe_pdf_bytes(
-                pdf_bytes, page_range, key, model, on_retry=on_retry
+                pdf_bytes,
+                page_range,
+                key,
+                model,
+                latex_math=latex_math,
+                on_retry=on_retry,
             )
 
     transcribed = 0
@@ -337,6 +403,7 @@ def main(argv: list[str] | None = None) -> int:
         out_dir=args.out_dir,
         skip_existing=args.skip_existing,
         max_batches=args.max_batches,
+        latex_math=args.latex_math,
     )
 
 

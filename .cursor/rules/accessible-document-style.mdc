@@ -1,55 +1,66 @@
 ---
-description: Style for accessible textbook files destined for Grade 2 braille translation.
+description: Style for screen-reader-accessible textbook transcription.
 globs: accessible/**/*.md
 alwaysApply: false
 ---
 
 # Accessible Document Style
 
-Write plain prose for later Grade 2 braille. Transcribe faithfully — do not change lesson content.
+Produce screen-reader-accessible text from scanned textbook pages. Do not output braille, contractions, or braille ASCII. Transcribe faithfully — do not change lesson content.
+
+If you cannot reliably make the content accessible, do not guess. Return only:
+
+CLARIFY:
+<one question>
 
 ## Paragraphs and headings
 Preserve the book's intended paragraphs. Do not merge unrelated blocks or split one thought across files.
 
-Apply titles with heading levels that match the book's hierarchy.
+Write headings as plain title lines matching the book's hierarchy. Do not use markdown hash headings.
 
-BAD: `# Adjectives` or `## Tip` when the book uses a plain label
+BAD: a leading number-sign heading when the book uses a plain label
 GOOD: a title-case or all-caps heading that matches the book, then body text
 GOOD: `Tip:` `Note:` `FYI:` `Directions:` `Examples` `Caption:` on their own lines when the book prints them that way
 
 ## Numbers, dates, and phones
 BAD: `1000 students` when the book shows a multi-digit quantity meant for reading aloud
 GOOD: `1,000 students` when comma grouping aids comprehension
-BAD: `March 4 2026` or `(555) 123-4567`
+BAD: `March 4 2026` or phone numbers that rely on parentheses
 GOOD: `March-4-2026` or `555-123-4567` using `-` as the separator
 
 ## Lists and tables
-Tables, numbered lists, lettered lists, and bullet points are allowed.
+Tables, numbered lists, lettered lists, and bullet points are allowed. Nested and indented lists are allowed.
 
-BAD: nested numbered lists (`1.` under `2.`)
-BAD: nested lettered lists (`a.` under `b.`)
-GOOD: flatten nested practice — renumber or reletter at one level only
-GOOD: `• identify adjectives` or `1.` `2.` `3.` at a single level
-GOOD: simple markdown tables when the book shows tabular data
+GOOD: `1.` with nested `a.` `b.` for questions under a numbered item
+GOOD: indented lists inside lists
+GOOD: `• identify adjectives` or `1.` `2.` `3.`
+GOOD: simple markdown pipe tables when the book shows tabular data
+BAD: a header-separator row of hyphens; three hyphens on their own line are a section break, not a table rule
+
+## Math
+Default: plain text only (`plus`, `minus`, `times`, `divided by`, `equals`, spoken-friendly fractions). No LaTeX.
+
+When math-LaTeX mode is on (Nemeth path): wrap every mathematical expression, equation, and arithmetic operation as `\(...\)` inline or `$$...$$` display. Leave all non-math prose unchanged. Braces inside LaTeX math spans are allowed. Still avoid asterisk, number-sign, and square brackets unless they appear in the source.
 
 ## Transcriber notes
 Use a separate paragraph to describe something visual on the page when it cannot be converted accessibly.
 
-BAD: `[Photo of a dog]` when the caption already says `Caption: A golden retriever sits in grass.`
+BAD: square-bracket image tags when the caption already says `Caption: A golden retriever sits in grass.`
 GOOD: convert the caption and skip the note when no extra value remains
 GOOD: `Transcriber note: A color photograph shows three bar graphs without numeric labels.` when the lesson depends on unseen layout
 
 ## Symbols to avoid
-Avoid `[]`, `#`, `&`, and `*` unless those characters appear explicitly in the source text.
+Avoid square brackets, braces, asterisk, number-sign, and ampersand unless those characters appear explicitly in the source text.
 
-BAD: `Adjectives & Articles` or `#1` or `*(required)*` or `**Tip:**`
+BAD: `Adjectives & Articles` or a number-sign item marker or asterisk emphasis
 GOOD: `Adjectives and Articles`
 GOOD: write "and" not `&`
 GOOD: a section break as `---`
+GOOD: unreadable word as `(unclear)` — not a square-bracket token
+
+In LaTeX math mode, do not flag braces used inside math spans. Still flag asterisk, number-sign, and square brackets.
 
 Possessive apostrophes, hyphens, dashes, and quotation marks are allowed when the book uses them.
-
-After writing, search the file for `[]`, `#`, `&`, and `*` and rephrase any hit unless the symbol is truly in the source.
 
 ## Word clouds and decorative covers
 Word clouds, title-page art, and other decorative layouts are not lesson content.

@@ -18,18 +18,26 @@ if str(SCRIPTS) not in sys.path:
 
 from adapt_pdf import (  # noqa: E402
     DEFAULT_MODEL,
+    LATEX_MATH_INSTRUCTION,
+    PLAIN_MATH_INSTRUCTION,
     RATE_LIMIT_EXHAUSTED,
     RATE_LIMIT_RETRYING,
     REMAINING_NOT_SENT,
     RETRYABLE_MAX_RETRIES,
+    STYLE_REMINDER,
     UNAVAILABLE_EXHAUSTED,
     _extract_text,
     build_generation_config,
+    build_interpretation_prompt,
+    build_style_rules,
     describe_retryable_http_error,
+    format_clarify_needed,
     format_retrying_status,
     format_stopped_batch_error,
     is_non_retryable_resource_exhausted,
     is_retryable_http_status,
+    parse_args,
+    parse_clarify,
     retry_delay_seconds,
     run_transcriptions,
     transcribe_pdf_bytes,
@@ -64,6 +72,71 @@ class AdaptPdfGeminiConfigTests(unittest.TestCase):
             ]
         }
         self.assertEqual(_extract_text(payload), "Lesson title")
+
+
+class AdaptPdfPromptTests(unittest.TestCase):
+    def test_style_reminder_is_screen_reader_not_grade_2_primary(self):
+        self.assertIn("screen-reader-accessible", STYLE_REMINDER)
+        self.assertIn("CLARIFY:", STYLE_REMINDER)
+        self.assertIn("(unclear)", STYLE_REMINDER)
+        self.assertNotIn("later Grade 2 braille", STYLE_REMINDER)
+        self.assertNotIn("Grade 2 braille translation", STYLE_REMINDER)
+        self.assertNotIn("[unclear]", STYLE_REMINDER)
+
+    def test_interpretation_prompt_default_is_plain_math(self):
+        prompt = build_interpretation_prompt("001-005")
+        self.assertIn("screen-reader-accessible", prompt)
+        self.assertIn("CLARIFY", prompt)
+        self.assertIn("Nested lists are allowed", prompt)
+        self.assertIn(PLAIN_MATH_INSTRUCTION, prompt)
+        self.assertNotIn(LATEX_MATH_INSTRUCTION, prompt)
+        self.assertNotIn("Grade 2 braille translation", prompt)
+
+    def test_latex_math_swaps_in_latex_instruction(self):
+        prompt = build_interpretation_prompt("006-010", latex_math=True)
+        self.assertIn(LATEX_MATH_INSTRUCTION, prompt)
+        self.assertNotIn(PLAIN_MATH_INSTRUCTION, prompt)
+        self.assertIn(r"\(...\)", prompt)
+        self.assertIn("$$...$$", prompt)
+        self.assertIn(LATEX_MATH_INSTRUCTION, build_style_rules(True))
+        self.assertEqual(build_style_rules(False), STYLE_REMINDER)
+
+    def test_style_constants_lockstep_with_js(self):
+        import json
+        import subprocess
+
+        script = (
+            "import { STYLE_RULES, PLAIN_MATH_INSTRUCTION, LATEX_MATH_INSTRUCTION } "
+            "from './docs/js/prompt.js'; "
+            "process.stdout.write(JSON.stringify({"
+            "STYLE_RULES, PLAIN_MATH_INSTRUCTION, LATEX_MATH_INSTRUCTION"
+            "}))"
+        )
+        raw = subprocess.check_output(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT,
+            text=True,
+        )
+        js = json.loads(raw)
+        self.assertEqual(js["STYLE_RULES"], STYLE_REMINDER)
+        self.assertEqual(js["PLAIN_MATH_INSTRUCTION"], PLAIN_MATH_INSTRUCTION)
+        self.assertEqual(js["LATEX_MATH_INSTRUCTION"], LATEX_MATH_INSTRUCTION)
+
+    def test_parse_clarify_detects_only_clarify_blocks(self):
+        self.assertEqual(parse_clarify("CLARIFY:\nIs the figure a pie chart?"), "Is the figure a pie chart?")
+        self.assertEqual(parse_clarify("clarify:\nWhat is the printed fraction?"), "What is the printed fraction?")
+        self.assertIsNone(parse_clarify("Lesson title\n\n1. Identify adjectives"))
+        self.assertEqual(parse_clarify("CLARIFY:"), "")
+
+    def test_latex_math_cli_flag(self):
+        self.assertTrue(parse_args(["book.pdf", "--latex-math"]).latex_math)
+        self.assertFalse(parse_args(["book.pdf"]).latex_math)
+
+    def test_format_clarify_needed_mentions_cli_has_no_chat(self):
+        message = format_clarify_needed("001-005", "Is the figure a pie chart?")
+        self.assertIn("001-005", message)
+        self.assertIn("CLI has no chat", message)
+        self.assertIn("Is the figure a pie chart?", message)
 
 
 class AdaptPdfStopOnErrorTests(unittest.TestCase):
@@ -292,6 +365,82 @@ class AdaptPdfRateLimitRetryTests(unittest.TestCase):
             )
         self.assertIn("API key not valid", str(raised.exception))
         self.assertEqual(calls["n"], 1)
+
+
+class AdaptPdfClarifyAndLatexRequestTests(unittest.TestCase):
+    def test_clarify_response_fails_the_batch_with_the_question(self):
+        def clarify(request, timeout=180):
+            payload = {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"text": "CLARIFY:\nIs the figure a pie chart?"}]
+                        }
+                    }
+                ]
+            }
+            return _FakeResponse(json.dumps(payload).encode("utf-8"))
+
+        with self.assertRaises(RuntimeError) as raised:
+            transcribe_pdf_bytes(
+                b"%PDF-fake",
+                "001-005",
+                "test-key",
+                "gemini-3.8-flash",
+                urlopen_fn=clarify,
+            )
+        self.assertIn("CLI has no chat", str(raised.exception))
+        self.assertIn("Is the figure a pie chart?", str(raised.exception))
+        self.assertIn("001-005", str(raised.exception))
+
+    def test_latex_math_includes_wrapping_instruction_in_request(self):
+        captured = {}
+
+        def capture(request, timeout=180):
+            captured["body"] = json.loads(request.data.decode("utf-8"))
+            payload = {
+                "candidates": [{"content": {"parts": [{"text": "Lesson title"}]}}]
+            }
+            return _FakeResponse(json.dumps(payload).encode("utf-8"))
+
+        text = transcribe_pdf_bytes(
+            b"%PDF-fake",
+            "001-005",
+            "test-key",
+            "gemini-3.8-flash",
+            latex_math=True,
+            urlopen_fn=capture,
+        )
+        self.assertEqual(text, "Lesson title")
+        system = captured["body"]["system_instruction"]["parts"][0]["text"]
+        user = captured["body"]["contents"][0]["parts"][1]["text"]
+        self.assertIn(LATEX_MATH_INSTRUCTION, system)
+        self.assertIn(LATEX_MATH_INSTRUCTION, user)
+        self.assertNotIn(PLAIN_MATH_INSTRUCTION, user)
+
+    def test_default_request_uses_plain_math_only(self):
+        captured = {}
+
+        def capture(request, timeout=180):
+            captured["body"] = json.loads(request.data.decode("utf-8"))
+            payload = {
+                "candidates": [{"content": {"parts": [{"text": "Lesson title"}]}}]
+            }
+            return _FakeResponse(json.dumps(payload).encode("utf-8"))
+
+        transcribe_pdf_bytes(
+            b"%PDF-fake",
+            "001-005",
+            "test-key",
+            "gemini-3.8-flash",
+            urlopen_fn=capture,
+        )
+        system = captured["body"]["system_instruction"]["parts"][0]["text"]
+        user = captured["body"]["contents"][0]["parts"][1]["text"]
+        self.assertEqual(system, STYLE_REMINDER)
+        self.assertIn(PLAIN_MATH_INSTRUCTION, user)
+        self.assertNotIn("Math LaTeX mode is on", system)
+        self.assertNotIn("Math LaTeX mode is on", user)
 
 
 class _FakeResponse:
