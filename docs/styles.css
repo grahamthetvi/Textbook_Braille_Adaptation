@@ -332,7 +332,8 @@ progress {
   font-size: 0.95rem;
 }
 
-.batch-row[data-status="running"] {
+.batch-row[data-status="running"],
+.batch-row[data-status="retrying"] {
   background: var(--accent-soft);
 }
 

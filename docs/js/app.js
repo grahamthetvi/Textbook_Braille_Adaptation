@@ -8,7 +8,7 @@ import { transcribeBatch, MODEL_OPTIONS, DEFAULT_MODEL } from "./gemini.js";
 import { validateMarkdown } from "./validate.js";
 import { downloadCombined, downloadZip } from "./download.js";
 import { planBatches } from "./batches.js";
-import { applyTranscriptionError, formatPageRange } from "./run-control.js";
+import { applyTranscriptionError, formatPageRange, formatRetryingStatus } from "./run-control.js";
 
 const SESSION_KEY = "textbook-adapter-api-key";
 const CUSTOM_MODEL_VALUE = "__custom__";
@@ -166,7 +166,7 @@ function renderBatchList() {
 
     const status = document.createElement("span");
     status.className = "batch-status";
-    status.textContent = batch.status;
+    status.textContent = batch.status === "retrying" ? "retrying" : batch.status;
 
     const issues = document.createElement("span");
     issues.className = "batch-issues";
@@ -289,7 +289,8 @@ function mergeSplitBatches(split) {
     const previous = state.batches.find(
       (batch) => batch.startPage === item.startPage && batch.endPage === item.endPage
     );
-    const status = previous?.status && previous.status !== "running" ? previous.status : "pending";
+    const inFlight = previous?.status === "running" || previous?.status === "retrying";
+    const status = previous?.status && !inFlight ? previous.status : "pending";
     return {
       startPage: item.startPage,
       endPage: item.endPage,
@@ -373,37 +374,58 @@ async function runAdaptation({ retryOnly = null } = {}) {
 
       batch.status = "running";
       batch.error = "";
-      setStatus(`Batch ${index + 1} of ${total}: pages ${formatPageRange(batch.startPage, batch.endPage)}`);
+      const pageRange = formatPageRange(batch.startPage, batch.endPage);
+      setStatus(`Batch ${index + 1} of ${total}: pages ${pageRange}`);
       render();
 
-      try {
-        const markdown = await transcribeBatch({
-          apiKey,
-          model,
-          startPage: batch.startPage,
-          endPage: batch.endPage,
-          pdfBytes: batch.bytes,
-          proxyUrl: els.proxyUrl.value.trim(),
-          signal: state.abortController.signal,
-        });
-        batch.markdown = markdown;
-        batch.issues = validateMarkdown(markdown, `pages-${formatPageRange(batch.startPage, batch.endPage)}`);
-        batch.status = "done";
-        batch.error = "";
-      } catch (err) {
-        const outcome = applyTranscriptionError(batch, err);
-        batch.status = outcome.batchStatus;
-        batch.error = outcome.error;
-        if (outcome.kind === "cancel") {
-          setAlert("");
+      for (;;) {
+        try {
+          const markdown = await transcribeBatch({
+            apiKey,
+            model,
+            startPage: batch.startPage,
+            endPage: batch.endPage,
+            pdfBytes: batch.bytes,
+            proxyUrl: els.proxyUrl.value.trim(),
+            signal: state.abortController.signal,
+            onRetry({ waitMs, httpStatus }) {
+              batch.status = "retrying";
+              batch.error = "";
+              setAlert("");
+              setStatus(
+                `Batch ${index + 1} of ${total}. ${formatRetryingStatus(pageRange, waitMs, httpStatus)}`
+              );
+              render();
+            },
+          });
+          batch.markdown = markdown;
+          batch.issues = validateMarkdown(markdown, `pages-${pageRange}`);
+          batch.status = "done";
+          batch.error = "";
+          break;
+        } catch (err) {
+          const outcome = applyTranscriptionError(batch, err);
+          if (outcome.kind === "retry") {
+            batch.status = "retrying";
+            batch.error = "";
+            setAlert("");
+            setStatus(`Batch ${index + 1} of ${total}. ${outcome.statusMessage}`);
+            render();
+            continue;
+          }
+          batch.status = outcome.batchStatus;
+          batch.error = outcome.error;
+          if (outcome.kind === "cancel") {
+            setAlert("");
+            setStatus(outcome.statusMessage);
+            render();
+            return;
+          }
+          setAlert(outcome.alertMessage);
           setStatus(outcome.statusMessage);
           render();
           return;
         }
-        setAlert(outcome.alertMessage);
-        setStatus(outcome.statusMessage);
-        render();
-        return;
       }
       render();
     }
@@ -473,7 +495,9 @@ function bindEvents() {
     if (state.running || !state.sourceBytes) {
       return;
     }
-    const hasWork = state.batches.some((batch) => batch.status === "done" || batch.status === "error");
+    const hasWork = state.batches.some(
+      (batch) => batch.status === "done" || batch.status === "error"
+    );
     if (!hasWork) {
       planFromLoadedPdf();
     }

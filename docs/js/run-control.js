@@ -1,6 +1,11 @@
 /** Stop-on-error helpers for sequential Gemini batch runs. */
 
 import { padPage } from "./batches.js";
+import {
+  RATE_LIMIT_RETRYING,
+  UNAVAILABLE_RETRYING,
+  isRetryableHttpStatus,
+} from "./gemini.js";
 
 export const REMAINING_NOT_SENT =
   "Remaining batches were not sent because of this failure.";
@@ -20,14 +25,39 @@ export function formatRunStoppedStatus(pageRange) {
   return `Stopped after pages ${pageRange} failed. Retry that range, or Adapt book to resume remaining pending batches.`;
 }
 
+export function formatRetryingStatus(pageRange, waitMs = 0, httpStatus = 429) {
+  const seconds = Math.max(1, Math.ceil((Number(waitMs) || 0) / 1000));
+  const reason =
+    httpStatus === 503 ? "Gemini is temporarily unavailable" : "Rate limited";
+  return `pages ${pageRange}: ${reason}. Waiting ${seconds}s, then retrying this batch.`;
+}
+
 export function isAbortError(err) {
   return Boolean(err) && err.name === "AbortError";
+}
+
+export function isRetryableTranscriptionError(err) {
+  if (!err || isAbortError(err)) {
+    return false;
+  }
+  if (err.retryable === true) {
+    return true;
+  }
+  if (err.retryable === false) {
+    return false;
+  }
+  if (isRetryableHttpStatus(err.httpStatus)) {
+    return true;
+  }
+  const message = String(err.message || "");
+  return message === RATE_LIMIT_RETRYING || message === UNAVAILABLE_RETRYING;
 }
 
 /**
  * Map a transcription exception onto batch + UI copy.
  * AbortError is cancellation, not a hard failure of completed work.
- * Every other error stops the run so remaining pending batches are not sent.
+ * In-progress 429/503 waits stay on the current batch (kind: "retry").
+ * Hard errors stop the run so remaining pending batches are not sent.
  */
 export function applyTranscriptionError(batch, err) {
   const pageRange = formatPageRange(batch.startPage, batch.endPage);
@@ -38,6 +68,19 @@ export function applyTranscriptionError(batch, err) {
       error: "",
       alertMessage: "",
       statusMessage: CANCELLED_STATUS,
+      pageRange,
+    };
+  }
+
+  if (isRetryableTranscriptionError(err)) {
+    const waitMs = Number(err.waitMs) || 0;
+    const httpStatus = err.httpStatus || 429;
+    return {
+      kind: "retry",
+      batchStatus: "retrying",
+      error: "",
+      alertMessage: "",
+      statusMessage: formatRetryingStatus(pageRange, waitMs, httpStatus),
       pageRange,
     };
   }
@@ -55,7 +98,8 @@ export function applyTranscriptionError(batch, err) {
 
 /**
  * Walk pending batches left to right. On the first failure or cancel, stop
- * without sending later pending rows. Success leaves remaining pending intact
+ * without sending later pending rows. A retryable wait stays on the current
+ * batch and does not mark it failed. Success leaves remaining pending intact
  * until the next iteration.
  */
 export function runPendingBatches(batches, transcribe) {
