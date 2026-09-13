@@ -14,7 +14,14 @@ import {
   isRetryableHttpStatus,
   retryDelayMs,
   transcribeBatch,
+  buildTranscribeContents,
 } from "../docs/js/gemini.js";
+import {
+  LATEX_MATH_INSTRUCTION,
+  PLAIN_MATH_INSTRUCTION,
+  STYLE_RULES,
+  parseClarify,
+} from "../docs/js/prompt.js";
 import { stripModelFences } from "../docs/js/validate.js";
 
 test("default Google API model is gemini-3.8-flash", () => {
@@ -224,6 +231,82 @@ test("hard 400 errors throw immediately without retrying", async () => {
     /API key not valid/
   );
   assert.equal(calls, 1);
+});
+
+test("latex-math mode includes LaTeX wrapping instruction in the Gemini request", async () => {
+  let body;
+  await transcribeBatch({
+    apiKey: "test-key",
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    latexMath: true,
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return jsonResponse(200, {
+        candidates: [{ content: { parts: [{ text: "Lesson title" }] } }],
+      });
+    },
+  });
+  const system = body.system_instruction.parts[0].text;
+  const user = body.contents[0].parts[1].text;
+  assert.equal(system.includes(LATEX_MATH_INSTRUCTION), true);
+  assert.equal(user.includes(LATEX_MATH_INSTRUCTION), true);
+  assert.equal(user.includes(PLAIN_MATH_INSTRUCTION), false);
+});
+
+test("default Gemini request uses plain-text math and screen-reader prompt", async () => {
+  let body;
+  await transcribeBatch({
+    apiKey: "test-key",
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return jsonResponse(200, {
+        candidates: [{ content: { parts: [{ text: "Lesson title" }] } }],
+      });
+    },
+  });
+  const system = body.system_instruction.parts[0].text;
+  const user = body.contents[0].parts[1].text;
+  assert.equal(system, STYLE_RULES);
+  assert.equal(user.includes(PLAIN_MATH_INSTRUCTION), true);
+  assert.equal(system.includes("Math LaTeX mode is on"), false);
+  assert.match(user, /screen-reader-accessible/);
+  assert.doesNotMatch(user, /Grade 2 braille translation/);
+});
+
+test("clarify history is sent as a follow-up turn with the same PDF", () => {
+  const contents = buildTranscribeContents({
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    clarifyHistory: [{ question: "Is the figure a pie chart?", answer: "Yes, a pie chart." }],
+  });
+  assert.equal(contents.length, 3);
+  assert.equal(contents[0].role, "user");
+  assert.equal(contents[1].role, "model");
+  assert.equal(contents[1].parts[0].text, "CLARIFY:\nIs the figure a pie chart?");
+  assert.equal(contents[2].role, "user");
+  assert.match(contents[2].parts[0].text, /Yes, a pie chart/);
+  assert.match(contents[2].parts[0].text, /transcribe this batch now/i);
+});
+
+test("transcribeBatch returns a CLARIFY block for the UI to parse", async () => {
+  const markdown = await transcribeBatch({
+    apiKey: "test-key",
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    fetchImpl: async () =>
+      jsonResponse(200, {
+        candidates: [{ content: { parts: [{ text: "CLARIFY:\nIs the figure a pie chart?" }] } }],
+      }),
+  });
+  assert.equal(markdown, "CLARIFY:\nIs the figure a pie chart?");
+  assert.equal(parseClarify(markdown), "Is the figure a pie chart?");
 });
 
 

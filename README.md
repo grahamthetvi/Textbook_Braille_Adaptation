@@ -1,6 +1,6 @@
 # Textbook Adapter
 
-Turn scanned textbook PDFs into accessible markdown for later Grade 2 braille translation. This app transcribes pages; it does not produce braille.
+Turn scanned textbook PDFs into screen-reader-accessible markdown. This app transcribes pages; it does not produce braille. Optional LaTeX wrapping supports a later Nemeth path.
 
 The primary path is a static web app: paste a Gemini API key, drop a PDF, split it into 5–8 page batches in the browser, send each batch to Gemini 3.8 Flash, and download markdown.
 
@@ -14,6 +14,8 @@ This site calls the **Google Gemini API**, not Cursor’s model picker. The mode
 4. Serve the site (`python3 scripts/serve_adapter.py`) or open the GitHub Pages URL after deploy.
 5. Paste the key into **Gemini API key**. Leave **Model** on Gemini 3.8 Flash.
 6. Drop a PDF, plan batches, then Adapt book.
+7. If Gemini cannot read a batch reliably, it asks a question in the clarification panel. Answer and continue that batch.
+8. Check **Wrap math in LaTeX (for Nemeth)** only when you want math wrapped as `\(...\)` or `$$...$$`. Leave it off for spoken plain-text math.
 
 The key stays in the browser session. It is sent only to Google (`generativelanguage.googleapis.com`), or to an optional same-origin proxy. Vertex AI / Gemini Enterprise OAuth tokens are not supported here.
 
@@ -24,7 +26,10 @@ CLI equivalent:
 ```bash
 python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --out-dir accessible
 python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --model gemini-3.8-flash
+python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --latex-math
 ```
+
+The CLI cannot answer clarification questions. If a batch returns `CLARIFY:`, that batch fails and prints the question; use the web adapter to continue the conversation.
 
 The page vendors [pdf-lib](https://github.com/Hopding/pdf-lib) and [JSZip](https://github.com/Stuk/jszip) in `docs/vendor/`.
 
@@ -45,8 +50,10 @@ https://grahamthetvi.github.io/Textbook_Braille_Adaptation/
 1. Paste the Gemini API key from the steps above.
 2. Drop a PDF on the page.
 3. Plan batches (5–8 pages each).
-4. Adapt book.
-5. Download a Word document, combined markdown, or a zip of per-batch files.
+4. Optionally check **Wrap math in LaTeX (for Nemeth)**.
+5. Adapt book.
+6. If a clarification panel appears, answer the question and continue that batch.
+7. Download a Word document, combined markdown, or a zip of per-batch files.
 
 ### Enable GitHub Pages
 
@@ -60,6 +67,7 @@ pip install -r scripts/requirements.txt
 # Adapt a PDF without the browser (needs a Gemini API key)
 python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --out-dir accessible
 python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --skip-existing --max-batches 1
+python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --latex-math
 
 # Split a PDF into 5–8 page batches
 python3 scripts/run_pipeline.py --file scans/file.pdf --dry-run
@@ -67,6 +75,7 @@ python3 scripts/run_pipeline.py --file scans/file.pdf
 
 # Check accessible markdown style
 python3 scripts/validate_accessible.py accessible/pages-001-005.md
+python3 scripts/validate_accessible.py --latex-math accessible/pages-001-005.md
 ```
 
 `scripts/serve_adapter.py` also exposes `POST /api/gemini/models/<model>:generateContent` so the page can use a same-origin proxy instead of calling Google directly.
@@ -99,14 +108,15 @@ Prefer the web app or `adapt_pdf.py` for a full book. Cursor workers cannot read
 
 Accessible files follow `.cursor/rules/accessible-document-style.mdc`:
 
-- Preserve paragraphs and lesson content.
-- Use headings, lists, and tables appropriately — no nested numbered or lettered lists.
+- Preserve paragraphs and lesson content for screen readers.
+- Use headings, lists (including nested lists), and tables. Number or letter questions under a numbered item.
 - Format multi-digit numbers with commas when helpful; dates and phones with hyphens.
 - Add transcriber notes only when a visual cannot be converted accessibly.
-- Avoid `[]`, `#`, `&`, and `*` unless they appear in the source.
+- Avoid `[]`, `{}`, `#`, `&`, and `*` unless they appear in the source. In LaTeX math mode, braces inside math spans are allowed.
+- Mark an unreadable word as `(unclear)`, not a square-bracket token.
 
 ## What you still need
 
 - A Gemini API key from Google AI Studio that can call `gemini-3.8-flash`.
-- Human review of math, diagrams, and `[unclear]` markers before braille translation.
+- Human review of math, diagrams, and `(unclear)` markers.
 - GitHub Pages enabled if you want the public site URL after merge.

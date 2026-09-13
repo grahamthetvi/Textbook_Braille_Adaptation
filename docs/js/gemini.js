@@ -1,6 +1,11 @@
 /** Gemini generateContent client. Calls Google directly from the browser. */
 
-import { STYLE_RULES, buildInterpretationPrompt, pageRangeLabel } from "./prompt.js";
+import {
+  buildInterpretationPrompt,
+  buildStyleRules,
+  formatClarifyFollowUp,
+  pageRangeLabel,
+} from "./prompt.js";
 import { stripModelFences } from "./validate.js";
 
 /** Google Gemini API model id. Do not use Cursor slugs such as gemini-3.8-flash-medium. */
@@ -130,6 +135,41 @@ export function describeGeminiError(payload, status, options = {}) {
   return message || `Gemini request failed (HTTP ${status}).`;
 }
 
+export function buildTranscribeContents({
+  startPage,
+  endPage,
+  pdfBytes,
+  latexMath = false,
+  clarifyHistory = [],
+}) {
+  const pageRange = pageRangeLabel(startPage, endPage);
+  const contents = [
+    {
+      role: "user",
+      parts: [
+        {
+          inline_data: {
+            mime_type: "application/pdf",
+            data: bytesToBase64(pdfBytes),
+          },
+        },
+        { text: buildInterpretationPrompt(pageRange, { latexMath }) },
+      ],
+    },
+  ];
+  for (const turn of clarifyHistory || []) {
+    contents.push({
+      role: "model",
+      parts: [{ text: `CLARIFY:\n${turn.question}` }],
+    });
+    contents.push({
+      role: "user",
+      parts: [{ text: formatClarifyFollowUp(turn.answer) }],
+    });
+  }
+  return contents;
+}
+
 export async function transcribeBatch({
   apiKey,
   model = DEFAULT_MODEL,
@@ -142,25 +182,20 @@ export async function transcribeBatch({
   onRetry,
   fetchImpl = globalThis.fetch,
   sleepFn = sleep,
+  latexMath = false,
+  clarifyHistory = [],
 }) {
-  const pageRange = pageRangeLabel(startPage, endPage);
   const body = {
     system_instruction: {
-      parts: [{ text: STYLE_RULES }],
+      parts: [{ text: buildStyleRules(latexMath) }],
     },
-    contents: [
-      {
-        parts: [
-          {
-            inline_data: {
-              mime_type: "application/pdf",
-              data: bytesToBase64(pdfBytes),
-            },
-          },
-          { text: buildInterpretationPrompt(pageRange) },
-        ],
-      },
-    ],
+    contents: buildTranscribeContents({
+      startPage,
+      endPage,
+      pdfBytes,
+      latexMath,
+      clarifyHistory,
+    }),
     generationConfig: buildGenerationConfig(model),
   };
 
