@@ -74,6 +74,15 @@ def build_generation_config(model: str) -> dict:
 
 REMAINING_NOT_SENT = "Remaining batches were not sent because of this failure."
 
+RETRYABLE_MAX_RETRIES = 40
+RETRY_CAP_SECONDS = 60
+RATE_LIMIT_RETRYING = "Rate limited. Waiting, then retrying this batch."
+RATE_LIMIT_EXHAUSTED = "This batch was rate limited after retries."
+UNAVAILABLE_RETRYING = (
+    "Gemini is temporarily unavailable. Waiting, then retrying this batch."
+)
+UNAVAILABLE_EXHAUSTED = "Gemini was temporarily unavailable after retries."
+
 
 def _page_range(start: int, end: int) -> str:
     return f"{start:03d}-{end:03d}"
@@ -81,6 +90,29 @@ def _page_range(start: int, end: int) -> str:
 
 def format_stopped_batch_error(page_range: str, error: str) -> str:
     return f"Batch pages {page_range} failed: {error}\n{REMAINING_NOT_SENT}"
+
+
+def is_retryable_http_status(status: int) -> bool:
+    return status in (429, 503)
+
+
+def retry_delay_seconds(attempt: int, cap: int = RETRY_CAP_SECONDS) -> int:
+    n = max(0, int(attempt))
+    return min(cap, 2**n)
+
+
+def describe_retryable_http_error(status: int, *, exhausted: bool = False) -> str:
+    if status == 503:
+        return UNAVAILABLE_EXHAUSTED if exhausted else UNAVAILABLE_RETRYING
+    return RATE_LIMIT_EXHAUSTED if exhausted else RATE_LIMIT_RETRYING
+
+
+def format_retrying_status(page_range: str, wait_s: int, status: int = 429) -> str:
+    seconds = max(1, int(wait_s) if wait_s else 1)
+    reason = (
+        "Gemini is temporarily unavailable" if status == 503 else "Rate limited"
+    )
+    return f"pages {page_range}: {reason}. Waiting {seconds}s, then retrying this batch."
 
 
 def _extract_text(payload: dict) -> str:
@@ -106,7 +138,11 @@ def transcribe_pdf_bytes(
     page_range: str,
     api_key: str,
     model: str,
-    max_retries: int = 4,
+    max_retries: int = RETRYABLE_MAX_RETRIES,
+    *,
+    sleep_fn=time.sleep,
+    on_retry=None,
+    urlopen_fn=None,
 ) -> str:
     prompt = INTERPRETATION_PROMPT.format(page_range=page_range)
     body = {
@@ -128,6 +164,7 @@ def transcribe_pdf_bytes(
     }
     url = f"{API_ROOT}/models/{model}:generateContent?key={api_key}"
     raw = json.dumps(body).encode("utf-8")
+    opener = urlopen_fn or urllib.request.urlopen
     last_error: Exception | None = None
     for attempt in range(max_retries + 1):
         request = urllib.request.Request(
@@ -137,7 +174,7 @@ def transcribe_pdf_bytes(
             headers={"Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(request, timeout=180) as response:
+            with opener(request, timeout=180) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as err:
             try:
@@ -145,15 +182,35 @@ def transcribe_pdf_bytes(
             except json.JSONDecodeError:
                 payload = {}
             message = (payload.get("error") or {}).get("message") or f"HTTP {err.code}"
-            if err.code in (429, 503):
-                last_error = RuntimeError(message)
-                time.sleep(min(16, 2**attempt))
-                continue
+            if is_retryable_http_status(err.code):
+                will_retry = attempt < max_retries
+                last_error = RuntimeError(
+                    describe_retryable_http_error(err.code, exhausted=not will_retry)
+                )
+                if will_retry:
+                    wait_s = retry_delay_seconds(attempt)
+                    if on_retry is not None:
+                        on_retry(
+                            {
+                                "status": err.code,
+                                "wait_s": wait_s,
+                                "attempt": attempt + 1,
+                                "message": format_retrying_status(
+                                    page_range, wait_s, err.code
+                                ),
+                            }
+                        )
+                    sleep_fn(wait_s)
+                    continue
+                break
             raise RuntimeError(message) from err
         except urllib.error.URLError as err:
+            will_retry = attempt < max_retries
             last_error = RuntimeError(f"Could not reach Gemini: {err.reason}")
-            time.sleep(attempt + 1)
-            continue
+            if will_retry:
+                sleep_fn(attempt + 1)
+                continue
+            break
         text = _strip_fences(_extract_text(payload))
         if not text:
             raise RuntimeError("Gemini returned empty text for this batch.")
@@ -203,8 +260,6 @@ def run_transcriptions(
     err_log=None,
 ) -> int:
     """Transcribe batches sequentially. Stop on the first failure."""
-    if transcribe_fn is None:
-        transcribe_fn = transcribe_pdf_bytes
     if log is None:
 
         def log(message: str) -> None:
@@ -214,6 +269,16 @@ def run_transcriptions(
 
         def err_log(message: str) -> None:
             print(message, file=sys.stderr, flush=True)
+
+    if transcribe_fn is None:
+
+        def transcribe_fn(pdf_bytes, page_range, key, model):
+            def on_retry(info):
+                log(f"  {info['message']}")
+
+            return transcribe_pdf_bytes(
+                pdf_bytes, page_range, key, model, on_retry=on_retry
+            )
 
     transcribed = 0
     skipped = 0

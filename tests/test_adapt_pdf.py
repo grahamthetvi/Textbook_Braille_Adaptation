@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import io
+import json
 import sys
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -15,11 +18,20 @@ if str(SCRIPTS) not in sys.path:
 
 from adapt_pdf import (  # noqa: E402
     DEFAULT_MODEL,
+    RATE_LIMIT_EXHAUSTED,
+    RATE_LIMIT_RETRYING,
     REMAINING_NOT_SENT,
+    RETRYABLE_MAX_RETRIES,
+    UNAVAILABLE_EXHAUSTED,
     _extract_text,
     build_generation_config,
+    describe_retryable_http_error,
+    format_retrying_status,
     format_stopped_batch_error,
+    is_retryable_http_status,
+    retry_delay_seconds,
     run_transcriptions,
+    transcribe_pdf_bytes,
 )
 from split_pdf import PageBatch  # noqa: E402
 
@@ -115,5 +127,141 @@ class AdaptPdfStopOnErrorTests(unittest.TestCase):
             self.assertIn(REMAINING_NOT_SENT, errors[0])
 
 
+class AdaptPdfRateLimitRetryTests(unittest.TestCase):
+    def test_429_and_503_are_retryable(self):
+        self.assertTrue(is_retryable_http_status(429))
+        self.assertTrue(is_retryable_http_status(503))
+        self.assertFalse(is_retryable_http_status(400))
+        self.assertFalse(is_retryable_http_status(401))
+        self.assertGreater(RETRYABLE_MAX_RETRIES, 4)
+
+    def test_retrying_copy_vs_exhausted_copy(self):
+        self.assertEqual(describe_retryable_http_error(429), RATE_LIMIT_RETRYING)
+        self.assertIn("Waiting, then retrying this batch", RATE_LIMIT_RETRYING)
+        self.assertEqual(
+            describe_retryable_http_error(429, exhausted=True),
+            RATE_LIMIT_EXHAUSTED,
+        )
+        self.assertNotIn("Waiting, then retrying", RATE_LIMIT_EXHAUSTED)
+        self.assertNotIn("Waiting, then retrying", UNAVAILABLE_EXHAUSTED)
+        self.assertIn("rate limited after retries", RATE_LIMIT_EXHAUSTED.lower())
+
+    def test_retry_delay_is_capped_exponential(self):
+        self.assertEqual(retry_delay_seconds(0), 1)
+        self.assertEqual(retry_delay_seconds(3), 8)
+        self.assertEqual(retry_delay_seconds(10), 60)
+        self.assertEqual(retry_delay_seconds(40), 60)
+
+    def test_retrying_status_is_not_failure_copy(self):
+        message = format_retrying_status("001-005", 8, 429)
+        self.assertEqual(
+            message,
+            "pages 001-005: Rate limited. Waiting 8s, then retrying this batch.",
+        )
+        self.assertNotIn("failed", message)
+
+    def test_transcribe_retries_429_in_place_then_succeeds(self):
+        calls = {"n": 0}
+        waits: list[int] = []
+        retries: list[dict] = []
+
+        def fake_urlopen(request, timeout=180):
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise urllib.error.HTTPError(
+                    "https://example.test",
+                    429,
+                    "Too Many Requests",
+                    None,
+                    io.BytesIO(b'{"error":{"message":"RESOURCE_EXHAUSTED"}}'),
+                )
+            payload = {
+                "candidates": [{"content": {"parts": [{"text": "Lesson title"}]}}]
+            }
+            return _FakeResponse(json.dumps(payload).encode("utf-8"))
+
+        text = transcribe_pdf_bytes(
+            b"%PDF-fake",
+            "001-005",
+            "test-key",
+            "gemini-3.8-flash",
+            max_retries=8,
+            sleep_fn=waits.append,
+            on_retry=retries.append,
+            urlopen_fn=fake_urlopen,
+        )
+        self.assertEqual(text, "Lesson title")
+        self.assertEqual(calls["n"], 3)
+        self.assertEqual(waits, [1, 2])
+        self.assertEqual(len(retries), 2)
+        self.assertIn("Rate limited", retries[0]["message"])
+        self.assertIn("Waiting", retries[0]["message"])
+        self.assertNotIn("failed", retries[0]["message"])
+
+    def test_exhausted_429_does_not_claim_it_is_retrying(self):
+        def always_429(request, timeout=180):
+            raise urllib.error.HTTPError(
+                "https://example.test",
+                429,
+                "Too Many Requests",
+                None,
+                io.BytesIO(b"{}"),
+            )
+
+        with self.assertRaises(RuntimeError) as raised:
+            transcribe_pdf_bytes(
+                b"%PDF-fake",
+                "001-005",
+                "test-key",
+                "gemini-3.8-flash",
+                max_retries=2,
+                sleep_fn=lambda _seconds: None,
+                urlopen_fn=always_429,
+            )
+        self.assertEqual(str(raised.exception), RATE_LIMIT_EXHAUSTED)
+        self.assertNotIn("Waiting, then retrying", str(raised.exception))
+
+    def test_hard_400_stops_without_retry(self):
+        calls = {"n": 0}
+
+        def always_400(request, timeout=180):
+            calls["n"] += 1
+            raise urllib.error.HTTPError(
+                "https://example.test",
+                400,
+                "Bad Request",
+                None,
+                io.BytesIO(b'{"error":{"message":"API key not valid"}}'),
+            )
+
+        with self.assertRaises(RuntimeError) as raised:
+            transcribe_pdf_bytes(
+                b"%PDF-fake",
+                "001-005",
+                "test-key",
+                "gemini-3.8-flash",
+                max_retries=8,
+                sleep_fn=lambda _seconds: self.fail("should not wait on a hard error"),
+                urlopen_fn=always_400,
+            )
+        self.assertIn("API key not valid", str(raised.exception))
+        self.assertEqual(calls["n"], 1)
+
+
+class _FakeResponse:
+    def __init__(self, payload: bytes):
+        self._payload = payload
+
+    def read(self) -> bytes:
+        return self._payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
 if __name__ == "__main__":
     unittest.main()
+
