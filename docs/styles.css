@@ -204,6 +204,7 @@ input[type="number"],
 input[type="url"],
 input[type="file"],
 select,
+textarea,
 button {
   font: inherit;
 }
@@ -212,13 +213,19 @@ input[type="password"],
 input[type="text"],
 input[type="number"],
 input[type="url"],
-select {
+select,
+textarea {
   width: 100%;
   padding: 0.45rem 0.6rem;
   border: 1px solid var(--ink);
   background: #fffdf8;
   color: var(--ink);
   border-radius: 2px;
+}
+
+textarea {
+  min-height: 4.5rem;
+  resize: vertical;
 }
 
 .drop-zone {
@@ -333,8 +340,24 @@ progress {
   font-size: 0.95rem;
 }
 
+.latex-hint {
+  margin: -0.35rem 0 0;
+}
+
+.clarify-question {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.clarify-actions {
+  margin-bottom: 0;
+}
+
 .batch-row[data-status="running"],
-.batch-row[data-status="retrying"] {
+.batch-row[data-status="retrying"],
+.batch-row[data-status="clarify"] {
   background: var(--accent-soft);
 }
 
