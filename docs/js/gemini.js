@@ -1,5 +1,7 @@
 /** Gemini generateContent client. Calls Google directly from the browser. */
 
+import { t } from "./i18n.js";
+import { en } from "./locales/en.js";
 import {
   buildInterpretationPrompt,
   buildStyleRules,
@@ -15,10 +17,10 @@ export const DEFAULT_MODEL = "gemini-3.8-flash";
 export const GEMINI_3_THINKING_LEVEL = "medium";
 
 export const MODEL_OPTIONS = [
-  { value: "gemini-3.8-flash", label: "Gemini 3.8 Flash (recommended)" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { value: "gemini-3.8-flash", get label() { return t("gemini.modelFlash38"); } },
+  { value: "gemini-2.5-flash", get label() { return t("gemini.model25Flash"); } },
+  { value: "gemini-2.5-pro", get label() { return t("gemini.model25Pro"); } },
+  { value: "gemini-2.0-flash", get label() { return t("gemini.model20Flash"); } },
 ];
 
 /** Rate limits are transient; keep retrying the current batch much longer than a handful of 429s. */
@@ -26,11 +28,10 @@ export const RETRYABLE_MAX_RETRIES = 40;
 export const RETRY_BASE_MS = 1000;
 export const RETRY_CAP_MS = 60_000;
 
-export const RATE_LIMIT_RETRYING = "Rate limited. Waiting, then retrying this batch.";
-export const RATE_LIMIT_EXHAUSTED = "This batch was rate limited after retries.";
-export const UNAVAILABLE_RETRYING =
-  "Gemini is temporarily unavailable. Waiting, then retrying this batch.";
-export const UNAVAILABLE_EXHAUSTED = "Gemini was temporarily unavailable after retries.";
+export const RATE_LIMIT_RETRYING = en["gemini.rateLimitRetrying"];
+export const RATE_LIMIT_EXHAUSTED = en["gemini.rateLimitExhausted"];
+export const UNAVAILABLE_RETRYING = en["gemini.unavailableRetrying"];
+export const UNAVAILABLE_EXHAUSTED = en["gemini.unavailableExhausted"];
 
 const DEFAULT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -47,7 +48,7 @@ function bytesToBase64(bytes) {
 export function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new DOMException("Adaptation cancelled", "AbortError"));
+      reject(new DOMException(t("gemini.cancelled"), "AbortError"));
       return;
     }
     const timer = setTimeout(() => {
@@ -56,7 +57,7 @@ export function sleep(ms, signal) {
     }, ms);
     function onAbort() {
       clearTimeout(timer);
-      reject(new DOMException("Adaptation cancelled", "AbortError"));
+      reject(new DOMException(t("gemini.cancelled"), "AbortError"));
     }
     signal?.addEventListener("abort", onAbort, { once: true });
   });
@@ -118,21 +119,21 @@ export function describeGeminiError(payload, status, options = {}) {
   const exhausted = Boolean(options?.exhausted);
   const message = payload?.error?.message || payload?.error?.status || "";
   if (status === 429 && isNonRetryableResourceExhausted(payload)) {
-    return message.trim() || RATE_LIMIT_EXHAUSTED;
+    return message.trim() || t("gemini.rateLimitExhausted");
   }
   if (status === 429) {
-    return exhausted ? RATE_LIMIT_EXHAUSTED : RATE_LIMIT_RETRYING;
+    return exhausted ? t("gemini.rateLimitExhausted") : t("gemini.rateLimitRetrying");
   }
   if (status === 503) {
-    return exhausted ? UNAVAILABLE_EXHAUSTED : UNAVAILABLE_RETRYING;
+    return exhausted ? t("gemini.unavailableExhausted") : t("gemini.unavailableRetrying");
   }
   if (status === 401 || status === 403 || /API key/i.test(message)) {
-    return message || "API key was rejected. Check the key and try again.";
+    return message || t("gemini.keyRejected");
   }
   if (payload?.promptFeedback?.blockReason) {
-    return `Gemini blocked this batch: ${payload.promptFeedback.blockReason}`;
+    return t("gemini.blocked", { reason: payload.promptFeedback.blockReason });
   }
-  return message || `Gemini request failed (HTTP ${status}).`;
+  return message || t("gemini.requestFailed", { status });
 }
 
 export function buildTranscribeContents({
@@ -204,7 +205,7 @@ export async function transcribeBatch({
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     if (signal?.aborted) {
-      throw new DOMException("Adaptation cancelled", "AbortError");
+      throw new DOMException(t("gemini.cancelled"), "AbortError");
     }
 
     let response;
@@ -232,10 +233,9 @@ export async function transcribeBatch({
       if (err?.name === "AbortError") {
         throw err;
       }
-      lastError = geminiError(
-        "Could not reach Gemini. If this page is blocked from calling Google, run python3 scripts/serve_adapter.py and use that local address, or set a proxy URL.",
-        { retryable: attempt < maxRetries }
-      );
+      lastError = geminiError(t("gemini.unreachable"), {
+        retryable: attempt < maxRetries,
+      });
       if (attempt < maxRetries) {
         await sleepFn(1000 * (attempt + 1), signal);
         continue;
@@ -278,10 +278,10 @@ export async function transcribeBatch({
 
     const text = stripModelFences(extractText(payload));
     if (!text) {
-      throw geminiError("Gemini returned empty text for this batch.");
+      throw geminiError(t("gemini.empty"));
     }
     return text;
   }
 
-  throw lastError || geminiError("Gemini request failed after retries.");
+  throw lastError || geminiError(t("gemini.failedAfterRetries"));
 }

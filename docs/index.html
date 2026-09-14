@@ -3,16 +3,56 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Textbook Adapter</title>
+    <title data-i18n="header.title">Textbook Adapter</title>
+    <script>
+      (function () {
+        var html = document.documentElement;
+        try {
+          var theme = localStorage.getItem("textbook-adapter-theme");
+          if (theme !== "dark" && theme !== "light") {
+            theme =
+              window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          }
+          html.setAttribute("data-theme", theme);
+        } catch (err) {
+          html.setAttribute("data-theme", "light");
+        }
+        try {
+          var locale = localStorage.getItem("textbook-adapter-locale");
+          if (locale !== "en" && locale !== "es" && locale !== "ar") {
+            var nav = String((navigator.language || "en")).toLowerCase();
+            locale = nav.indexOf("ar") === 0 ? "ar" : nav.indexOf("es") === 0 ? "es" : "en";
+          }
+          html.lang = locale;
+          html.dir = locale === "ar" ? "rtl" : "ltr";
+        } catch (err) {
+          html.lang = "en";
+          html.dir = "ltr";
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to main content</a>
+    <a class="skip-link" href="#main" data-i18n="header.skip">Skip to main content</a>
 
     <header class="site-header">
-      <p class="eyebrow">Accessible textbook prep</p>
-      <h1>Textbook Adapter</h1>
-      <p class="lede">
+      <div class="site-toolbar" role="group" data-i18n-aria-label="toolbar.displayOptions" aria-label="Display options">
+        <label for="locale-select" data-i18n="toolbar.language">Language</label>
+        <select id="locale-select" name="locale">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="ar">العربية</option>
+        </select>
+        <button id="theme-toggle" type="button" aria-pressed="false" data-i18n="toolbar.darkMode">
+          Dark mode
+        </button>
+      </div>
+      <p class="eyebrow" data-i18n="header.eyebrow">Accessible textbook prep</p>
+      <h1 data-i18n="header.title">Textbook Adapter</h1>
+      <p class="lede" data-i18n="header.lede">
         Drop a scanned textbook PDF, paste a Gemini API key, and download
         screen-reader-accessible markdown. The key stays in this browser session and
         is sent only to Google Gemini, or to an optional proxy you set.
@@ -22,10 +62,10 @@
     <main id="main">
       <form id="adapter-form" novalidate>
         <fieldset class="panel">
-          <legend>Gemini access</legend>
+          <legend data-i18n="form.geminiAccess">Gemini access</legend>
 
           <div class="field">
-            <label for="api-key">Gemini API key</label>
+            <label for="api-key" data-i18n="form.apiKey">Gemini API key</label>
             <input
               id="api-key"
               name="api-key"
@@ -34,7 +74,7 @@
               spellcheck="false"
               aria-describedby="api-key-hint"
             />
-            <p id="api-key-hint" class="hint">
+            <p id="api-key-hint" class="hint" data-i18n-html="form.apiKeyHint">
               Create a Gemini API key in
               <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer">Google AI Studio</a>.
               Required to adapt. Not written to disk. Session storage is used only if
@@ -43,26 +83,26 @@
           </div>
 
           <details class="setup-steps">
-            <summary>How to connect Gemini 3.8 Flash</summary>
+            <summary data-i18n="form.setupSummary">How to connect Gemini 3.8 Flash</summary>
             <ol>
-              <li>
+              <li data-i18n-html="form.setupStep1">
                 Open
                 <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer">Google AI Studio API keys</a>
                 and sign in with the Google account that should be billed.
               </li>
-              <li>
+              <li data-i18n-html="form.setupStep2">
                 Create an API key in a Google Cloud project. If prompted, enable the
                 <strong>Gemini API</strong> (Generative Language API) for that project.
               </li>
-              <li>
+              <li data-i18n-html="form.setupStep3">
                 Paste the key in the field above. Leave <strong>Model</strong> on
                 Gemini 3.8 Flash. The Google API id is <code>gemini-3.8-flash</code>.
               </li>
-              <li>
+              <li data-i18n-html="form.setupStep4">
                 Do not type Cursor names such as <code>gemini-3.8-flash-medium</code>
                 into Custom model. Those are not valid Google API ids.
               </li>
-              <li>
+              <li data-i18n-html="form.setupStep5">
                 If this page cannot reach Google from the browser, run
                 <code>python3 scripts/serve_adapter.py</code> and set the proxy to
                 <code>http://127.0.0.1:8000/api/gemini</code>.
@@ -72,19 +112,19 @@
 
           <div class="field checkbox-field">
             <input id="remember-key" name="remember-key" type="checkbox" />
-            <label for="remember-key">Remember key this session</label>
+            <label for="remember-key" data-i18n="form.rememberKey">Remember key this session</label>
           </div>
 
           <div class="field-row">
             <div class="field">
-              <label for="model">Model</label>
+              <label for="model" data-i18n="form.model">Model</label>
               <select id="model" name="model" aria-describedby="model-hint"></select>
-              <p id="model-hint" class="hint">
+              <p id="model-hint" class="hint" data-i18n="form.modelHint">
                 Use Gemini 3.8 Flash unless an older key cannot call that model.
               </p>
             </div>
             <div class="field" id="custom-model-wrap" hidden>
-              <label for="custom-model">Custom model</label>
+              <label for="custom-model" data-i18n="form.customModel">Custom model</label>
               <input
                 id="custom-model"
                 name="custom-model"
@@ -95,7 +135,7 @@
               />
             </div>
             <div class="field field-narrow">
-              <label for="batch-size">Preferred batch size</label>
+              <label for="batch-size" data-i18n="form.batchSize">Preferred batch size</label>
               <input
                 id="batch-size"
                 name="batch-size"
@@ -110,18 +150,18 @@
 
           <div class="field checkbox-field">
             <input id="latex-math" name="latex-math" type="checkbox" />
-            <label for="latex-math">Wrap math in LaTeX (for Nemeth)</label>
+            <label for="latex-math" data-i18n="form.latexMath">Wrap math in LaTeX (for Nemeth)</label>
           </div>
-          <p class="hint latex-hint">
+          <p class="hint latex-hint" data-i18n="form.latexHint">
             Off by default: math is spoken plain text. When checked, Gemini wraps
             math in LaTeX so it can later be converted to Nemeth.
           </p>
         </fieldset>
 
         <details class="panel advanced">
-          <summary>Advanced: optional proxy URL</summary>
+          <summary data-i18n="form.advanced">Advanced: optional proxy URL</summary>
           <div class="field">
-            <label for="proxy-url">Proxy URL</label>
+            <label for="proxy-url" data-i18n="form.proxyUrl">Proxy URL</label>
             <input
               id="proxy-url"
               name="proxy-url"
@@ -130,7 +170,7 @@
               spellcheck="false"
               placeholder="http://127.0.0.1:8000/api/gemini"
             />
-            <p class="hint">
+            <p class="hint" data-i18n="form.proxyHint">
               Leave blank to call Google Gemini from this browser. Set a proxy if
               this page cannot reach Google, using a host that forwards
               generateContent.
@@ -139,12 +179,12 @@
         </details>
 
         <fieldset class="panel">
-          <legend>Textbook PDF</legend>
+          <legend data-i18n="form.pdfLegend">Textbook PDF</legend>
           <div id="drop-zone" class="drop-zone">
-            <p class="drop-lead">Drop a textbook PDF here</p>
-            <p class="drop-or">or</p>
+            <p class="drop-lead" data-i18n="form.dropLead">Drop a textbook PDF here</p>
+            <p class="drop-or" data-i18n="form.dropOr">or</p>
             <label class="file-picker" for="pdf-file">
-              <span class="file-picker-label">PDF file</span>
+              <span class="file-picker-label" data-i18n="form.pdfFile">PDF file</span>
               <input id="pdf-file" name="pdf-file" type="file" accept="application/pdf" />
             </label>
             <p id="file-meta" class="file-meta">No file loaded.</p>
@@ -152,17 +192,17 @@
         </fieldset>
 
         <div class="actions">
-          <button id="plan-btn" type="button">Plan batches</button>
-          <button id="adapt-btn" type="submit">Adapt book</button>
-          <button id="cancel-btn" type="button" disabled>Cancel</button>
+          <button id="plan-btn" type="button" data-i18n="form.planBatches">Plan batches</button>
+          <button id="adapt-btn" type="submit" data-i18n="form.adaptBook">Adapt book</button>
+          <button id="cancel-btn" type="button" disabled data-i18n="form.cancel">Cancel</button>
         </div>
       </form>
 
       <p id="form-alert" class="alert" hidden role="alert"></p>
 
       <section id="clarify-section" class="panel" aria-labelledby="clarify-heading" hidden>
-        <h2 id="clarify-heading">Clarification needed</h2>
-        <p class="hint">
+        <h2 id="clarify-heading" data-i18n="clarify.heading">Clarification needed</h2>
+        <p class="hint" data-i18n="clarify.hint">
           Gemini paused this batch. Answer the question to continue. Remaining
           pending batches wait until this one finishes. You can also retry from
           scratch without answering.
@@ -170,26 +210,26 @@
         <p id="clarify-meta" class="file-meta"></p>
         <p id="clarify-question" class="clarify-question"></p>
         <div class="field">
-          <label for="clarify-answer">Your answer</label>
+          <label for="clarify-answer" data-i18n="clarify.answer">Your answer</label>
           <textarea id="clarify-answer" name="clarify-answer" rows="3"></textarea>
         </div>
         <div class="actions clarify-actions">
-          <button id="clarify-continue-btn" type="button">Continue this batch</button>
-          <button id="clarify-retry-btn" type="button">Retry from scratch</button>
+          <button id="clarify-continue-btn" type="button" data-i18n="clarify.continue">Continue this batch</button>
+          <button id="clarify-retry-btn" type="button" data-i18n="clarify.retry">Retry from scratch</button>
         </div>
       </section>
 
       <section class="panel" aria-labelledby="progress-heading">
-        <h2 id="progress-heading">Progress</h2>
+        <h2 id="progress-heading" data-i18n="progress.heading">Progress</h2>
         <p id="status" role="status" aria-live="polite">Load a PDF to plan batches. Gemini is not called until you adapt.</p>
-        <label class="progress-label" for="progress-bar">Batches completed</label>
+        <label class="progress-label" for="progress-bar" data-i18n="progress.batchesCompleted">Batches completed</label>
         <progress id="progress-bar" max="1" value="0"></progress>
-        <ul id="batch-list" class="batch-list" aria-label="Batch status"></ul>
+        <ul id="batch-list" class="batch-list" data-i18n-aria-label="progress.batchStatus" aria-label="Batch status"></ul>
       </section>
 
       <section id="error-section" class="panel" aria-labelledby="errors-heading" hidden>
-        <h2 id="errors-heading">Failed batches</h2>
-        <p class="hint">
+        <h2 id="errors-heading" data-i18n="errors.heading">Failed batches</h2>
+        <p class="hint" data-i18n="errors.hint">
           A failed batch or a clarification question stops the run. Remaining
           pending ranges are not sent.
           Rate limits wait and retry the current batch without stopping.
@@ -200,12 +240,12 @@
       </section>
 
       <section class="panel downloads" aria-labelledby="download-heading">
-        <h2 id="download-heading">Download</h2>
-        <p class="hint">Downloads include completed batches only, even if some rows still need a retry.</p>
+        <h2 id="download-heading" data-i18n="download.heading">Download</h2>
+        <p class="hint" data-i18n="download.hint">Downloads include completed batches only, even if some rows still need a retry.</p>
         <div class="actions">
-          <button id="download-docx-btn" type="button" disabled>Download Word document</button>
-          <button id="download-md-btn" type="button" disabled>Download combined markdown</button>
-          <button id="download-zip-btn" type="button" disabled>Download zip</button>
+          <button id="download-docx-btn" type="button" disabled data-i18n="download.docx">Download Word document</button>
+          <button id="download-md-btn" type="button" disabled data-i18n="download.md">Download combined markdown</button>
+          <button id="download-zip-btn" type="button" disabled data-i18n="download.zip">Download zip</button>
         </div>
       </section>
     </main>

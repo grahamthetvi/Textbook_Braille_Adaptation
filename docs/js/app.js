@@ -10,9 +10,27 @@ import { validateMarkdown } from "./validate.js";
 import { downloadCombined, downloadDocx, downloadZip } from "./download.js";
 import { planBatches } from "./batches.js";
 import { applyTranscriptionError, formatPageRange, formatRetryingStatus } from "./run-control.js";
+import {
+  applyTranslations,
+  detectLocale,
+  getLocale,
+  onLocaleChange,
+  setLocale,
+  t,
+} from "./i18n.js";
+import { initTheme, syncThemeToggle, toggleTheme } from "./theme.js";
 
 const SESSION_KEY = "textbook-adapter-api-key";
 const CUSTOM_MODEL_VALUE = "__custom__";
+
+const BATCH_STATUS_KEYS = {
+  pending: "batch.pending",
+  running: "batch.running",
+  done: "batch.done",
+  error: "batch.error",
+  retrying: "batch.retrying",
+  clarify: "batch.clarify",
+};
 
 const els = {};
 const state = {
@@ -25,6 +43,8 @@ const state = {
   dragDepth: 0,
   lastSplitPreferred: null,
   lastClarifyKey: "",
+  uiStatus: { key: "status.loadPdf", vars: {} },
+  uiAlert: { key: "", vars: {} },
 };
 
 function cacheElements() {
@@ -58,6 +78,8 @@ function cacheElements() {
   els.clarifyAnswer = document.getElementById("clarify-answer");
   els.clarifyContinueBtn = document.getElementById("clarify-continue-btn");
   els.clarifyRetryBtn = document.getElementById("clarify-retry-btn");
+  els.localeSelect = document.getElementById("locale-select");
+  els.themeToggle = document.getElementById("theme-toggle");
 }
 
 function getPreferredBatchSize() {
@@ -77,18 +99,37 @@ function getApiKey() {
   return els.apiKey.value.trim();
 }
 
-function setStatus(message) {
-  els.status.textContent = message;
+function setStatus(key, vars = {}) {
+  state.uiStatus = { key, vars };
+  els.status.textContent = t(key, vars);
 }
 
-function setAlert(message) {
-  if (!message) {
+function refreshStatus() {
+  if (state.uiStatus?.key) {
+    els.status.textContent = t(state.uiStatus.key, state.uiStatus.vars);
+  }
+}
+
+function setAlert(key, vars = {}) {
+  if (!key) {
+    state.uiAlert = { key: "", vars: {} };
+    els.formAlert.hidden = true;
+    els.formAlert.textContent = "";
+    return;
+  }
+  state.uiAlert = { key, vars };
+  els.formAlert.hidden = false;
+  els.formAlert.textContent = t(key, vars);
+}
+
+function refreshAlert() {
+  if (!state.uiAlert?.key) {
     els.formAlert.hidden = true;
     els.formAlert.textContent = "";
     return;
   }
   els.formAlert.hidden = false;
-  els.formAlert.textContent = message;
+  els.formAlert.textContent = t(state.uiAlert.key, state.uiAlert.vars);
 }
 
 function completedBatches() {
@@ -96,20 +137,24 @@ function completedBatches() {
 }
 
 function populateModelSelect() {
+  const previous = els.model.value;
   els.model.replaceChildren();
   for (const option of MODEL_OPTIONS) {
     const node = document.createElement("option");
     node.value = option.value;
     node.textContent = option.label;
-    if (option.value === DEFAULT_MODEL) {
-      node.selected = true;
-    }
     els.model.append(node);
   }
   const custom = document.createElement("option");
   custom.value = CUSTOM_MODEL_VALUE;
-  custom.textContent = "Custom model";
+  custom.textContent = t("form.customModel");
   els.model.append(custom);
+  const next = previous || DEFAULT_MODEL;
+  if ([...els.model.options].some((option) => option.value === next)) {
+    els.model.value = next;
+  } else {
+    els.model.value = DEFAULT_MODEL;
+  }
   syncCustomModelField();
 }
 
@@ -164,7 +209,7 @@ function renderBatchList() {
   if (!state.batches.length) {
     const empty = document.createElement("li");
     empty.className = "batch-row";
-    empty.textContent = "No batches planned yet.";
+    empty.textContent = t("batch.noBatches");
     els.batchList.append(empty);
     return;
   }
@@ -176,25 +221,21 @@ function renderBatchList() {
 
     const range = document.createElement("span");
     range.className = "batch-range";
-    range.textContent = `pages ${formatPageRange(batch.startPage, batch.endPage)}`;
+    range.textContent = t("batch.pages", {
+      range: formatPageRange(batch.startPage, batch.endPage),
+    });
 
     const status = document.createElement("span");
     status.className = "batch-status";
-    if (batch.status === "retrying") {
-      status.textContent = "retrying";
-    } else if (batch.status === "clarify") {
-      status.textContent = "needs clarification";
-    } else {
-      status.textContent = batch.status;
-    }
+    status.textContent = t(BATCH_STATUS_KEYS[batch.status] || "batch.pending");
 
     const issues = document.createElement("span");
     issues.className = "batch-issues";
     if (batch.status === "done") {
       const count = batch.issues.length;
-      issues.textContent = count === 1 ? "1 issue" : `${count} issues`;
+      issues.textContent = count === 1 ? t("batch.issueOne") : t("batch.issues", { count });
     } else {
-      issues.textContent = "—";
+      issues.textContent = t("batch.emDash");
     }
 
     row.append(range, status, issues);
@@ -212,11 +253,14 @@ function renderErrors() {
     item.className = "error-item";
 
     const text = document.createElement("p");
-    text.textContent = `pages ${formatPageRange(batch.startPage, batch.endPage)}: ${batch.error || "This batch failed."}`;
+    text.textContent = t("errors.pagesFailed", {
+      range: formatPageRange(batch.startPage, batch.endPage),
+      error: batch.error || t("errors.batchFailed"),
+    });
 
     const retry = document.createElement("button");
     retry.type = "button";
-    retry.textContent = "Retry";
+    retry.textContent = t("errors.retry");
     retry.disabled = state.running;
     retry.addEventListener("click", () => retryBatch(batch));
 
@@ -235,9 +279,8 @@ function renderClarify() {
 
   const pageRange = formatPageRange(batch.startPage, batch.endPage);
   els.clarifySection.hidden = false;
-  els.clarifyMeta.textContent = `pages ${pageRange}`;
-  els.clarifyQuestion.textContent =
-    batch.clarifyQuestion || "Gemini asked a question but did not include the text.";
+  els.clarifyMeta.textContent = t("clarify.pages", { range: pageRange });
+  els.clarifyQuestion.textContent = batch.clarifyQuestion || t("clarify.missingQuestion");
 
   const key = `${batch.startPage}-${batch.endPage}-${batch.clarifyQuestion}`;
   if (key !== state.lastClarifyKey) {
@@ -256,16 +299,30 @@ function renderDownloads() {
 
 function render() {
   if (state.fileName) {
-    const pages = state.pageCount === 1 ? "1 page" : `${state.pageCount} pages`;
-    els.fileMeta.textContent = `${state.fileName} · ${pages}`;
+    els.fileMeta.textContent =
+      state.pageCount === 1
+        ? t("file.onePage", { fileName: state.fileName })
+        : t("file.pages", { fileName: state.fileName, count: state.pageCount });
   } else {
-    els.fileMeta.textContent = "No file loaded.";
+    els.fileMeta.textContent = t("form.noFile");
   }
   renderProgress();
   renderBatchList();
   renderClarify();
   renderErrors();
   renderDownloads();
+}
+
+function refreshUi() {
+  applyTranslations();
+  populateModelSelect();
+  syncThemeToggle();
+  refreshStatus();
+  refreshAlert();
+  render();
+  if (els.localeSelect) {
+    els.localeSelect.value = getLocale();
+  }
 }
 
 function resetBatchesFromRanges(ranges) {
@@ -286,7 +343,7 @@ function resetBatchesFromRanges(ranges) {
 
 function planFromLoadedPdf() {
   if (!state.sourceBytes || !state.pageCount) {
-    setAlert("Choose a PDF first, then plan batches.");
+    setAlert("alert.choosePdfFirst");
     return false;
   }
   const preferred = getPreferredBatchSize();
@@ -294,22 +351,22 @@ function planFromLoadedPdf() {
   resetBatchesFromRanges(planBatches(state.pageCount, preferred));
   const count = state.batches.length;
   setAlert("");
-  setStatus(
-    count === 1
-      ? `Planned 1 batch from ${state.pageCount} pages. Gemini is not called until you adapt.`
-      : `Planned ${count} batches from ${state.pageCount} pages. Gemini is not called until you adapt.`
-  );
+  if (count === 1) {
+    setStatus("status.plannedOne", { count: state.pageCount });
+  } else {
+    setStatus("status.plannedMany", { batches: count, count: state.pageCount });
+  }
   render();
   return true;
 }
 
 async function loadPdfFile(file) {
   if (!file) {
-    setAlert("Choose a PDF file.");
+    setAlert("alert.choosePdf");
     return;
   }
   if (file.type && file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-    setAlert("That file is not a PDF. Choose a textbook scan saved as PDF.");
+    setAlert("alert.notPdf");
     return;
   }
 
@@ -319,14 +376,18 @@ async function loadPdfFile(file) {
     state.pageCount = info.pageCount;
     state.sourceBytes = info.bytes;
     if (!state.pageCount) {
-      setAlert("This PDF has no pages to adapt.");
+      setAlert("alert.noPages");
       state.batches = [];
       render();
       return;
     }
     planFromLoadedPdf();
   } catch (err) {
-    setAlert(err?.message || "Could not read that PDF. Try a different file.");
+    if (err?.message) {
+      setAlert("alert.raw", { raw: err.message });
+    } else {
+      setAlert("alert.couldNotRead");
+    }
   }
 }
 
@@ -359,7 +420,7 @@ async function ensureBatchBytes() {
   if (!needsSplit) {
     return;
   }
-  setStatus("Splitting the PDF into batches…");
+  setStatus("status.splitting");
   const { pageCount, batches } = await splitPdfBytes(state.sourceBytes, preferred);
   state.pageCount = pageCount;
   state.lastSplitPreferred = preferred;
@@ -375,17 +436,17 @@ async function runAdaptation({ retryOnly = null } = {}) {
   const apiKey = getApiKey();
   const model = getModel();
   if (!apiKey) {
-    setAlert("Paste a Gemini API key before adapting. The key is kept in this browser session only.");
+    setAlert("alert.needKey");
     els.apiKey.focus();
     return;
   }
   if (!model) {
-    setAlert("Choose a model, or select Custom model and enter a model id.");
+    setAlert("alert.needModel");
     (els.model.value === CUSTOM_MODEL_VALUE ? els.customModel : els.model).focus();
     return;
   }
   if (!state.sourceBytes) {
-    setAlert("Drop or choose a textbook PDF first.");
+    setAlert("alert.needPdf");
     return;
   }
 
@@ -409,7 +470,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
 
     const queue = state.batches.filter((batch) => batch.status === "pending");
     if (!queue.length) {
-      setStatus("No pending batches. Retry a failed row, or download what already completed.");
+      setStatus("status.noPending");
       render();
       return;
     }
@@ -424,7 +485,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
       batch.status = "running";
       batch.error = "";
       const pageRange = formatPageRange(batch.startPage, batch.endPage);
-      setStatus(`Batch ${index + 1} of ${total}: pages ${pageRange}`);
+      setStatus("status.batchProgress", { index: index + 1, total, range: pageRange });
       render();
 
       for (;;) {
@@ -443,9 +504,11 @@ async function runAdaptation({ retryOnly = null } = {}) {
               batch.status = "retrying";
               batch.error = "";
               setAlert("");
-              setStatus(
-                `Batch ${index + 1} of ${total}. ${formatRetryingStatus(pageRange, waitMs, httpStatus)}`
-              );
+              setStatus("status.batchRetry", {
+                index: index + 1,
+                total,
+                message: formatRetryingStatus(pageRange, waitMs, httpStatus),
+              });
               render();
             },
           });
@@ -457,9 +520,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
             batch.status = "clarify";
             batch.error = "";
             setAlert("");
-            setStatus(
-              `Paused on pages ${pageRange}. Gemini needs a clarification before that batch can finish.`
-            );
+            setStatus("status.pausedClarify", { range: pageRange });
             render();
             return;
           }
@@ -475,7 +536,11 @@ async function runAdaptation({ retryOnly = null } = {}) {
             batch.status = "retrying";
             batch.error = "";
             setAlert("");
-            setStatus(`Batch ${index + 1} of ${total}. ${outcome.statusMessage}`);
+            setStatus("status.batchRetry", {
+              index: index + 1,
+              total,
+              message: outcome.statusMessage,
+            });
             render();
             continue;
           }
@@ -483,12 +548,12 @@ async function runAdaptation({ retryOnly = null } = {}) {
           batch.error = outcome.error;
           if (outcome.kind === "cancel") {
             setAlert("");
-            setStatus(outcome.statusMessage);
+            setStatus("status.raw", { raw: outcome.statusMessage });
             render();
             return;
           }
-          setAlert(outcome.alertMessage);
-          setStatus(outcome.statusMessage);
+          setAlert("alert.raw", { raw: outcome.alertMessage });
+          setStatus("status.raw", { raw: outcome.statusMessage });
           render();
           return;
         }
@@ -499,14 +564,18 @@ async function runAdaptation({ retryOnly = null } = {}) {
     const done = completedBatches().length;
     const failed = state.batches.filter((batch) => batch.status === "error").length;
     if (failed) {
-      setStatus(`${done} of ${total} batches completed. Retry failed rows or download what finished.`);
+      setStatus("status.completedWithErrors", { done, total });
     } else {
-      setStatus(`Finished ${done} of ${total} batches. You can download the accessible markdown.`);
+      setStatus("status.finished", { done, total });
     }
     render();
   } catch (err) {
-    setAlert(err?.message || "Could not split that PDF.");
-    setStatus("Adaptation stopped.");
+    if (err?.message) {
+      setAlert("alert.raw", { raw: err.message });
+    } else {
+      setAlert("alert.couldNotSplit");
+    }
+    setStatus("status.stopped");
   } finally {
     state.abortController = null;
     setRunning(false);
@@ -532,12 +601,12 @@ function continueClarify() {
   }
   const batch = state.batches.find((item) => item.status === "clarify");
   if (!batch) {
-    setAlert("There is no batch waiting for clarification.");
+    setAlert("alert.noClarify");
     return;
   }
   const answer = els.clarifyAnswer.value.trim();
   if (!answer) {
-    setAlert("Type an answer so Gemini can finish this batch.");
+    setAlert("alert.typeAnswer");
     els.clarifyAnswer.focus();
     return;
   }
@@ -590,6 +659,12 @@ function bindEvents() {
   els.model.addEventListener("change", syncCustomModelField);
   els.apiKey.addEventListener("input", persistApiKey);
   els.rememberKey.addEventListener("change", persistApiKey);
+  els.localeSelect.addEventListener("change", () => {
+    setLocale(els.localeSelect.value);
+  });
+  els.themeToggle.addEventListener("click", () => {
+    toggleTheme();
+  });
   els.pdfFile.addEventListener("change", () => {
     const file = els.pdfFile.files?.[0];
     if (file) {
@@ -647,7 +722,9 @@ function bindEvents() {
 }
 
 cacheElements();
-populateModelSelect();
+onLocaleChange(refreshUi);
+initTheme();
 restoreApiKey();
 bindEvents();
-render();
+setLocale(detectLocale());
+refreshUi();

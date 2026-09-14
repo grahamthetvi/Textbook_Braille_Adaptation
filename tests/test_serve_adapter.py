@@ -52,6 +52,19 @@ class ServeAdapterTests(unittest.TestCase):
         self.assertIn("Wrap math in LaTeX (for Nemeth)", body)
         self.assertIn("clarify-section", body)
         self.assertIn("screen-reader-accessible", body)
+        self.assertIn('id="locale-select"', body)
+        self.assertIn('id="theme-toggle"', body)
+        self.assertIn("data-theme", body)
+
+    def test_i18n_module(self):
+        conn = self._conn()
+        conn.request("GET", "/js/i18n.js")
+        response = conn.getresponse()
+        body = response.read().decode("utf-8")
+        conn.close()
+        self.assertEqual(response.status, 200)
+        self.assertIn("export function t(", body)
+        self.assertIn("textbook-adapter-locale", body)
 
     def test_app_module(self):
         conn = self._conn()
