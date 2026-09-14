@@ -21,6 +21,15 @@ export function formatIssueCount(count) {
   return n === 1 ? "1 issue" : `${n} issues`;
 }
 
+/** Short validator copy for the batch issue list. */
+export function formatIssueLine(message) {
+  const match = String(message || "").match(/:(\d+): (.+)$/);
+  if (!match) {
+    return String(message || "");
+  }
+  return `Line ${match[1]}: ${match[2]}`;
+}
+
 /** Line text from the batch markdown for a `label:lineno:` validator message. */
 export function excerptForIssue(markdown, issue) {
   const match = String(issue || "").match(/:(\d+): forbidden character/);

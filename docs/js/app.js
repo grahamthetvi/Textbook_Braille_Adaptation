@@ -22,7 +22,7 @@ import { validateMarkdown } from "./validate.js";
 import { downloadCombined, downloadDocx, downloadZip } from "./download.js";
 import { planBatches, padPage } from "./batches.js";
 import { applyTranscriptionError, formatPageRange, formatRetryingStatus } from "./run-control.js";
-import { excerptForIssue, issueGroupId } from "./issues.js";
+import { formatIssueLine } from "./issues.js";
 import {
   applyTranslations,
   detectLocale,
@@ -481,53 +481,47 @@ function renderBatchList() {
     status.className = "batch-status";
     status.textContent = t(BATCH_STATUS_KEYS[batch.status] || "batch.pending");
 
-    const issues = document.createElement("span");
-    issues.className = "batch-issues";
     if (batch.status === "done") {
       if (batch.skippedBlank) {
+        const issues = document.createElement("span");
+        issues.className = "batch-issues";
         issues.textContent = t("batch.skippedBlank");
+        row.append(range, status, issues);
       } else if (batch.issues.length) {
-        const groupId = issueGroupId(batch.startPage, batch.endPage);
-        row.id = groupId;
-        const link = document.createElement("a");
-        link.href = `#${groupId}`;
-        const count = batch.issues.length;
-        link.textContent = count === 1 ? t("batch.issueOne") : t("batch.issues", { count });
-        issues.append(link);
+        row.append(range, status, issueDetails(batch));
       } else {
+        const issues = document.createElement("span");
+        issues.className = "batch-issues";
         issues.textContent = t("batch.issues", { count: 0 });
+        row.append(range, status, issues);
       }
     } else {
+      const issues = document.createElement("span");
+      issues.className = "batch-issues";
       issues.textContent = t("batch.emDash");
-    }
-
-    row.append(range, status, issues);
-    if (batch.status === "done" && !batch.skippedBlank && batch.issues.length) {
-      row.append(issueDetailList(batch));
+      row.append(range, status, issues);
     }
     els.batchList.append(row);
   }
 }
 
-function issueDetailList(batch) {
+function issueDetails(batch) {
+  const details = document.createElement("details");
+  details.className = "batch-issue-details";
+  const summary = document.createElement("summary");
+  summary.className = "batch-issues";
+  const count = batch.issues.length;
+  summary.textContent = count === 1 ? t("batch.issueOne") : t("batch.issues", { count });
   const list = document.createElement("ul");
   list.className = "issue-detail-list";
   for (const message of batch.issues) {
     const item = document.createElement("li");
-    const text = document.createElement("p");
-    text.className = "issue-message";
-    text.textContent = message;
-    item.append(text);
-    const excerpt = excerptForIssue(batch.markdown, message);
-    if (excerpt) {
-      const quote = document.createElement("p");
-      quote.className = "issue-excerpt";
-      quote.textContent = excerpt;
-      item.append(quote);
-    }
+    item.className = "issue-message";
+    item.textContent = formatIssueLine(message);
     list.append(item);
   }
-  return list;
+  details.append(summary, list);
+  return details;
 }
 
 function renderErrors() {
