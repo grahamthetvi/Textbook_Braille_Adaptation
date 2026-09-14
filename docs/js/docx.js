@@ -172,15 +172,130 @@ function paragraphXml(text) {
 }
 
 const PAGE_BREAK = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+const PAGE_CONTENT_TWIPS = 9360;
+const TABLE_BORDER = 'w:val="single" w:sz="4" w:space="0" w:color="666666"';
+const HEADER_FILL = "D9E2F3";
+
+function tableBorder(side) {
+  return `<w:${side} ${TABLE_BORDER}/>`;
+}
+
+/** Split a markdown pipe-table line into trimmed cell strings. */
+export function parsePipeCells(line) {
+  let inner = String(line).trim();
+  if (inner.startsWith("|")) {
+    inner = inner.slice(1);
+  }
+  if (inner.endsWith("|")) {
+    inner = inner.slice(0, -1);
+  }
+  return inner.split("|").map((cell) => cell.trim());
+}
+
+/** True when a line is a markdown pipe-table row (not a section break). */
+export function isPipeTableRow(line) {
+  const trimmed = String(line).trim();
+  if (!trimmed.startsWith("|")) {
+    return false;
+  }
+  const pipes = trimmed.match(/\|/g);
+  return Boolean(pipes && pipes.length >= 2);
+}
+
+/** True for a GFM header-separator row such as `| --- | :---: |`. */
+export function isPipeSeparatorRow(cells) {
+  if (!cells.length) {
+    return false;
+  }
+  return cells.every((cell) => {
+    const compact = String(cell).replace(/\s+/g, "");
+    return /^:?-{3,}:?$/.test(compact);
+  });
+}
+
+function padCells(row, colCount) {
+  const next = row.slice(0, colCount);
+  while (next.length < colCount) {
+    next.push("");
+  }
+  return next;
+}
+
+function tableCellXml(text, { header, colWidth }) {
+  const shading = header
+    ? `<w:shd w:val="clear" w:color="auto" w:fill="${HEADER_FILL}"/>`
+    : "";
+  const runs = parseInlineRuns(text).map((run) =>
+    header ? { ...run, bold: true } : run
+  );
+  const paragraph = runs.length
+    ? `<w:p>${runs.map(runXml).join("")}</w:p>`
+    : "<w:p/>";
+  return `<w:tc><w:tcPr><w:tcW w:w="${colWidth}" w:type="dxa"/>${shading}</w:tcPr>${paragraph}</w:tc>`;
+}
+
+function tableRowXml(cells, { header, colWidth }) {
+  const props = header ? "<w:trPr><w:tblHeader/></w:trPr>" : "";
+  return `<w:tr>${props}${cells
+    .map((cell) => tableCellXml(cell, { header, colWidth }))
+    .join("")}</w:tr>`;
+}
+
+function tableXml(rowLines) {
+  const dataRows = rowLines
+    .map(parsePipeCells)
+    .filter((cells) => !isPipeSeparatorRow(cells));
+  if (!dataRows.length) {
+    return rowLines.map((line) => paragraphXml(line)).join("");
+  }
+  const colCount = Math.max(...dataRows.map((row) => row.length), 1);
+  const padded = dataRows.map((row) => padCells(row, colCount));
+  const colWidth = Math.max(Math.floor(PAGE_CONTENT_TWIPS / colCount), 1);
+  const grid = Array.from(
+    { length: colCount },
+    () => `<w:gridCol w:w="${colWidth}"/>`
+  ).join("");
+  const headerRow = tableRowXml(padded[0], { header: true, colWidth });
+  const bodyRows = padded
+    .slice(1)
+    .map((row) => tableRowXml(row, { header: false, colWidth }))
+    .join("");
+  return `<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>${tableBorder(
+    "top"
+  )}${tableBorder("left")}${tableBorder("bottom")}${tableBorder("right")}${tableBorder(
+    "insideH"
+  )}${tableBorder(
+    "insideV"
+  )}</w:tblBorders><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${headerRow}${bodyRows}</w:tbl>`;
+}
 
 export function markdownToDocumentXml(markdown) {
   const lines = String(markdown || "")
     .replace(/\r\n/g, "\n")
     .replace(/\n$/, "")
     .split("\n");
-  const body = lines
-    .map((line) => (line.trim() === "---" ? PAGE_BREAK : paragraphXml(line)))
-    .join("");
+  const parts = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim() === "---") {
+      parts.push(PAGE_BREAK);
+      i += 1;
+      continue;
+    }
+    if (isPipeTableRow(line)) {
+      const start = i;
+      i += 1;
+      while (i < lines.length && isPipeTableRow(lines[i])) {
+        i += 1;
+      }
+      parts.push(tableXml(lines.slice(start, i)));
+      continue;
+    }
+    parts.push(paragraphXml(line));
+    i += 1;
+  }
+  const body = parts.join("");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
