@@ -422,29 +422,40 @@ progress {
   font-size: 0.95rem;
 }
 
-.batch-issues a {
+.batch-issues {
   color: var(--accent-ink);
 }
 
-.batch-row:target {
-  background: var(--accent-soft);
+.batch-issue-details {
+  justify-self: end;
+}
+
+.batch-issue-details > summary {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0;
+  list-style: none;
+}
+
+.batch-issue-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.batch-issue-details[open] {
+  grid-column: 1 / -1;
 }
 
 .issue-detail-list {
-  grid-column: 1 / -1;
-  margin: 0.15rem 0 0.2rem;
-  padding-inline-start: 1.2rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
 }
 
-.issue-message,
-.issue-excerpt {
+.issue-message {
   margin: 0;
-}
-
-.issue-excerpt {
-  margin: 0.15rem 0 0.55rem;
+  padding: 0.1rem 0;
   color: var(--ink-muted);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .latex-hint {

@@ -4,6 +4,7 @@ import {
   batchesWithStyleIssues,
   excerptForIssue,
   formatIssueCount,
+  formatIssueLine,
   issueGroupId,
 } from "../docs/js/issues.js";
 
@@ -15,6 +16,14 @@ test("formatIssueCount uses singular and plural labels", () => {
 
 test("issueGroupId matches zero-padded page ranges", () => {
   assert.equal(issueGroupId(1, 5), "issues-001-005");
+});
+
+test("formatIssueLine keeps validator text concise", () => {
+  assert.equal(
+    formatIssueLine("pages-001-005:2: forbidden character '&'"),
+    "Line 2: forbidden character '&'"
+  );
+  assert.equal(formatIssueLine("unexpected"), "unexpected");
 });
 
 test("batchesWithStyleIssues keeps completed rows that have validator hits", () => {
