@@ -3,53 +3,56 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Textbook Adapter</title>
+    <title data-i18n="header.title">Textbook Adapter</title>
     <script>
       (function () {
+        var html = document.documentElement;
         try {
           var theme = localStorage.getItem("textbook-adapter-theme");
           if (theme !== "dark" && theme !== "light") {
             theme =
-              window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches
+              window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
                 ? "dark"
                 : "light";
           }
-          document.documentElement.dataset.theme = theme;
-        } catch (e) {}
+          html.setAttribute("data-theme", theme);
+        } catch (err) {
+          html.setAttribute("data-theme", "light");
+        }
         try {
           var locale = localStorage.getItem("textbook-adapter-locale");
-          if (!locale && navigator.language) {
-            locale = navigator.language.slice(0, 2).toLowerCase();
+          if (locale !== "en" && locale !== "es" && locale !== "ar") {
+            var nav = String((navigator.language || "en")).toLowerCase();
+            locale = nav.indexOf("ar") === 0 ? "ar" : nav.indexOf("es") === 0 ? "es" : "en";
           }
-          if (locale === "es" || locale === "ar" || locale === "en") {
-            document.documentElement.lang = locale;
-            document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
-          }
-        } catch (e) {}
+          html.lang = locale;
+          html.dir = locale === "ar" ? "rtl" : "ltr";
+        } catch (err) {
+          html.lang = "en";
+          html.dir = "ltr";
+        }
       })();
     </script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <a class="skip-link" href="#main" data-i18n="header.skipLink">Skip to main content</a>
+    <a class="skip-link" href="#main" data-i18n="header.skip">Skip to main content</a>
 
     <header class="site-header">
-      <div
-        class="site-toolbar"
-        role="group"
-        data-i18n-aria-label="header.toolbarLabel"
-        aria-label="Language and display"
-      >
-        <label for="locale-select" data-i18n="header.language">Language</label>
+      <div class="site-toolbar" role="group" data-i18n-aria-label="toolbar.displayOptions" aria-label="Display options">
+        <label for="locale-select" data-i18n="toolbar.language">Language</label>
         <select id="locale-select" name="locale" aria-describedby="locale-hint">
           <option value="en">English</option>
           <option value="es">Español</option>
           <option value="ar">العربية</option>
         </select>
-        <button id="theme-toggle" type="button" aria-pressed="false">Night mode</button>
+        <button id="theme-toggle" type="button" aria-pressed="false" data-i18n="toolbar.darkMode">
+          Dark mode
+        </button>
       </div>
       <p id="locale-hint" class="hint locale-hint" data-i18n="header.languageHint">
-        Gemini asks clarification questions in this language and marks unreadable words in this language. Printed lesson text stays in the language of the book.
+        Gemini asks clarification questions in this language and marks unreadable
+        words in this language. Printed lesson text stays in the language of the book.
       </p>
       <p class="eyebrow" data-i18n="header.eyebrow">Accessible textbook prep</p>
       <h1 data-i18n="header.title">Textbook Adapter</h1>
@@ -75,7 +78,7 @@
               spellcheck="false"
               aria-describedby="api-key-hint"
             />
-            <p id="api-key-hint" class="hint" data-i18n-html="form.apiKeyHintHtml">
+            <p id="api-key-hint" class="hint" data-i18n-html="form.apiKeyHint">
               Create a Gemini API key in
               <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer">Google AI Studio</a>.
               Required to adapt. Not written to disk. Session storage is used only if
@@ -86,24 +89,24 @@
           <details class="setup-steps">
             <summary data-i18n="form.setupSummary">How to connect Gemini 3.8 Flash</summary>
             <ol>
-              <li data-i18n-html="form.setupStep1Html">
+              <li data-i18n-html="form.setupStep1">
                 Open
                 <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer">Google AI Studio API keys</a>
                 and sign in with the Google account that should be billed.
               </li>
-              <li data-i18n-html="form.setupStep2Html">
+              <li data-i18n-html="form.setupStep2">
                 Create an API key in a Google Cloud project. If prompted, enable the
                 <strong>Gemini API</strong> (Generative Language API) for that project.
               </li>
-              <li data-i18n-html="form.setupStep3Html">
+              <li data-i18n-html="form.setupStep3">
                 Paste the key in the field above. Leave <strong>Model</strong> on
                 Gemini 3.8 Flash. The Google API id is <code>gemini-3.8-flash</code>.
               </li>
-              <li data-i18n-html="form.setupStep4Html">
+              <li data-i18n-html="form.setupStep4">
                 Do not type Cursor names such as <code>gemini-3.8-flash-medium</code>
                 into Custom model. Those are not valid Google API ids.
               </li>
-              <li data-i18n-html="form.setupStep5Html">
+              <li data-i18n-html="form.setupStep5">
                 If this page cannot reach Google from the browser, run
                 <code>python3 scripts/serve_adapter.py</code> and set the proxy to
                 <code>http://127.0.0.1:8000/api/gemini</code>.
@@ -160,7 +163,7 @@
         </fieldset>
 
         <details class="panel advanced">
-          <summary data-i18n="form.advancedSummary">Advanced: optional proxy URL</summary>
+          <summary data-i18n="form.advanced">Advanced: optional proxy URL</summary>
           <div class="field">
             <label for="proxy-url" data-i18n="form.proxyUrl">Proxy URL</label>
             <input
@@ -185,7 +188,7 @@
             <p class="drop-lead" data-i18n="form.dropLead">Drop a textbook PDF here</p>
             <p class="drop-or" data-i18n="form.dropOr">or</p>
             <label class="file-picker" for="pdf-file">
-              <span class="file-picker-label" data-i18n="form.filePicker">PDF file</span>
+              <span class="file-picker-label" data-i18n="form.pdfFile">PDF file</span>
               <input id="pdf-file" name="pdf-file" type="file" accept="application/pdf" />
             </label>
             <p id="file-meta" class="file-meta">No file loaded.</p>
@@ -244,9 +247,9 @@
       <section class="panel" aria-labelledby="progress-heading">
         <h2 id="progress-heading" data-i18n="progress.heading">Progress</h2>
         <p id="status" role="status" aria-live="polite">Load a PDF to plan batches. Gemini is not called until you adapt.</p>
-        <label class="progress-label" for="progress-bar" data-i18n="progress.label">Batches completed</label>
+        <label class="progress-label" for="progress-bar" data-i18n="progress.batchesCompleted">Batches completed</label>
         <progress id="progress-bar" max="1" value="0"></progress>
-        <ul id="batch-list" class="batch-list" data-i18n-aria-label="progress.batchListLabel" aria-label="Batch status"></ul>
+        <ul id="batch-list" class="batch-list" data-i18n-aria-label="progress.batchStatus" aria-label="Batch status"></ul>
       </section>
 
       <section id="issue-section" class="panel" aria-labelledby="issues-heading" hidden>
@@ -278,7 +281,7 @@
         <p class="hint" data-i18n="download.hint">Downloads include completed batches only, even if some rows still need a retry.</p>
         <div class="actions">
           <button id="download-docx-btn" type="button" disabled data-i18n="download.docx">Download Word document</button>
-          <button id="download-md-btn" type="button" disabled data-i18n="download.markdown">Download combined markdown</button>
+          <button id="download-md-btn" type="button" disabled data-i18n="download.md">Download combined markdown</button>
           <button id="download-zip-btn" type="button" disabled data-i18n="download.zip">Download zip</button>
         </div>
       </section>

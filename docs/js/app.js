@@ -13,16 +13,33 @@ import { planBatches, padPage } from "./batches.js";
 import { applyTranscriptionError, formatPageRange, formatRetryingStatus } from "./run-control.js";
 import { batchesWithStyleIssues, excerptForIssue, issueGroupId } from "./issues.js";
 import {
+  applyTranslations,
+  detectLocale,
+  getLocale,
+  onLocaleChange,
+  setLocale,
+  t,
+} from "./i18n.js";
+import { initTheme, syncThemeToggle, toggleTheme } from "./theme.js";
+import {
   isBlankBatchError,
   isBlankTranscription,
   pagePreviewFileName,
   skippedBlankMarkdown,
 } from "./blank-pages.js";
-import { getLocale, initI18n, onLocaleChange, setLocale, t } from "./i18n.js";
-import { getTheme, initTheme, toggleTheme } from "./theme.js";
 
 const SESSION_KEY = "textbook-adapter-api-key";
 const CUSTOM_MODEL_VALUE = "__custom__";
+
+const BATCH_STATUS_KEYS = {
+  pending: "batch.pending",
+  running: "batch.running",
+  done: "batch.done",
+  error: "batch.error",
+  retrying: "batch.retrying",
+  clarify: "batch.clarify",
+  blank: "batch.blank",
+};
 
 const els = {};
 const state = {
@@ -38,9 +55,8 @@ const state = {
   lastBlankKey: "",
   blankPreviewUrls: [],
   blankPreviewToken: 0,
-  statusKey: "status.idle",
-  statusVars: {},
-  alert: null,
+  uiStatus: { key: "status.loadPdf", vars: {} },
+  uiAlert: { key: "", vars: {} },
 };
 
 function cacheElements() {
@@ -62,8 +78,6 @@ function cacheElements() {
   els.status = document.getElementById("status");
   els.progressBar = document.getElementById("progress-bar");
   els.batchList = document.getElementById("batch-list");
-  els.issueSection = document.getElementById("issue-section");
-  els.issueList = document.getElementById("issue-list");
   els.errorSection = document.getElementById("error-section");
   els.errorList = document.getElementById("error-list");
   els.downloadDocxBtn = document.getElementById("download-docx-btn");
@@ -72,19 +86,21 @@ function cacheElements() {
   els.latexMath = document.getElementById("latex-math");
   els.clarifySection = document.getElementById("clarify-section");
   els.clarifyMeta = document.getElementById("clarify-meta");
-  els.clarifyDraftWrap = document.getElementById("clarify-draft-wrap");
-  els.clarifyDraft = document.getElementById("clarify-draft");
   els.clarifyQuestion = document.getElementById("clarify-question");
   els.clarifyAnswer = document.getElementById("clarify-answer");
   els.clarifyContinueBtn = document.getElementById("clarify-continue-btn");
   els.clarifyRetryBtn = document.getElementById("clarify-retry-btn");
+  els.clarifyDraftWrap = document.getElementById("clarify-draft-wrap");
+  els.clarifyDraft = document.getElementById("clarify-draft");
+  els.localeSelect = document.getElementById("locale-select");
+  els.themeToggle = document.getElementById("theme-toggle");
   els.blankSection = document.getElementById("blank-section");
   els.blankMeta = document.getElementById("blank-meta");
   els.blankPages = document.getElementById("blank-pages");
   els.blankSkipBtn = document.getElementById("blank-skip-btn");
   els.blankRetryBtn = document.getElementById("blank-retry-btn");
-  els.localeSelect = document.getElementById("locale-select");
-  els.themeToggle = document.getElementById("theme-toggle");
+  els.issueSection = document.getElementById("issue-section");
+  els.issueList = document.getElementById("issue-list");
 }
 
 function getPreferredBatchSize() {
@@ -105,59 +121,44 @@ function getApiKey() {
 }
 
 function setStatus(key, vars = {}) {
-  state.statusKey = key;
-  state.statusVars = vars;
+  state.uiStatus = { key, vars };
   els.status.textContent = t(key, vars);
 }
 
-function setAlert(keyOrMessage, vars) {
-  if (!keyOrMessage) {
-    state.alert = null;
-    els.formAlert.hidden = true;
-    els.formAlert.textContent = "";
-    return;
+function refreshStatus() {
+  if (state.uiStatus?.key) {
+    els.status.textContent = t(state.uiStatus.key, state.uiStatus.vars);
   }
-  if (vars && typeof vars === "object") {
-    state.alert = { type: "key", key: keyOrMessage, vars };
-    els.formAlert.hidden = false;
-    els.formAlert.textContent = t(keyOrMessage, vars);
-    return;
-  }
-  state.alert = { type: "literal", text: keyOrMessage };
-  els.formAlert.hidden = false;
-  els.formAlert.textContent = keyOrMessage;
 }
 
-function refreshStatusAndAlert() {
-  els.status.textContent = t(state.statusKey, state.statusVars);
-  if (!state.alert) {
+function setAlert(key, vars = {}) {
+  if (!key) {
+    state.uiAlert = { key: "", vars: {} };
+    els.formAlert.hidden = true;
+    els.formAlert.textContent = "";
+    return;
+  }
+  state.uiAlert = { key, vars };
+  els.formAlert.hidden = false;
+  els.formAlert.textContent = t(key, vars);
+}
+
+function refreshAlert() {
+  if (!state.uiAlert?.key) {
     els.formAlert.hidden = true;
     els.formAlert.textContent = "";
     return;
   }
   els.formAlert.hidden = false;
-  if (state.alert.type === "key") {
-    els.formAlert.textContent = t(state.alert.key, state.alert.vars);
-  } else {
-    els.formAlert.textContent = state.alert.text;
-  }
+  els.formAlert.textContent = t(state.uiAlert.key, state.uiAlert.vars);
 }
 
 function completedBatches() {
   return state.batches.filter((batch) => batch.status === "done" && batch.markdown);
 }
 
-function syncThemeToggleLabel() {
-  if (!els.themeToggle) {
-    return;
-  }
-  const dark = getTheme() === "dark";
-  els.themeToggle.setAttribute("aria-pressed", dark ? "true" : "false");
-  els.themeToggle.textContent = dark ? t("header.themeLight") : t("header.themeDark");
-}
-
 function populateModelSelect() {
-  const previous = els.model.value || DEFAULT_MODEL;
+  const previous = els.model.value;
   els.model.replaceChildren();
   for (const option of MODEL_OPTIONS) {
     const node = document.createElement("option");
@@ -169,8 +170,12 @@ function populateModelSelect() {
   custom.value = CUSTOM_MODEL_VALUE;
   custom.textContent = t("form.customModel");
   els.model.append(custom);
-  const values = [...els.model.options].map((option) => option.value);
-  els.model.value = values.includes(previous) ? previous : DEFAULT_MODEL;
+  const next = previous || DEFAULT_MODEL;
+  if ([...els.model.options].some((option) => option.value === next)) {
+    els.model.value = next;
+  } else {
+    els.model.value = DEFAULT_MODEL;
+  }
   syncCustomModelField();
 }
 
@@ -222,33 +227,12 @@ function renderProgress() {
   els.progressBar.value = state.batches.length ? done : 0;
 }
 
-function batchStatusLabel(status) {
-  switch (status) {
-    case "retrying":
-      return t("progress.retrying");
-    case "clarify":
-      return t("progress.clarify");
-    case "blank":
-      return t("progress.blank");
-    case "pending":
-      return t("progress.pending");
-    case "running":
-      return t("progress.running");
-    case "done":
-      return t("progress.done");
-    case "error":
-      return t("progress.error");
-    default:
-      return status;
-  }
-}
-
 function renderBatchList() {
   els.batchList.replaceChildren();
   if (!state.batches.length) {
     const empty = document.createElement("li");
     empty.className = "batch-row";
-    empty.textContent = t("progress.noBatches");
+    empty.textContent = t("batch.noBatches");
     els.batchList.append(empty);
     return;
   }
@@ -260,32 +244,30 @@ function renderBatchList() {
 
     const range = document.createElement("span");
     range.className = "batch-range";
-    range.textContent = t("progress.pages", {
-      pageRange: formatPageRange(batch.startPage, batch.endPage),
+    range.textContent = t("batch.pages", {
+      range: formatPageRange(batch.startPage, batch.endPage),
     });
 
     const status = document.createElement("span");
     status.className = "batch-status";
-    status.textContent = batchStatusLabel(batch.status);
+    status.textContent = t(BATCH_STATUS_KEYS[batch.status] || "batch.pending");
 
     const issues = document.createElement("span");
     issues.className = "batch-issues";
     if (batch.status === "done") {
       if (batch.skippedBlank) {
-        issues.textContent = t("progress.skippedBlank");
+        issues.textContent = t("batch.skippedBlank");
       } else if (batch.issues.length) {
         const link = document.createElement("a");
         link.href = `#${issueGroupId(batch.startPage, batch.endPage)}`;
-        link.textContent =
-          batch.issues.length === 1
-            ? t("progress.issueOne")
-            : t("progress.issueMany", { count: batch.issues.length });
+        const count = batch.issues.length;
+        link.textContent = count === 1 ? t("batch.issueOne") : t("batch.issues", { count });
         issues.append(link);
       } else {
-        issues.textContent = t("progress.issueMany", { count: 0 });
+        issues.textContent = t("batch.issues", { count: 0 });
       }
     } else {
-      issues.textContent = t("progress.dash");
+      issues.textContent = t("batch.emDash");
     }
 
     row.append(range, status, issues);
@@ -304,8 +286,8 @@ function renderIssues() {
     group.id = issueGroupId(batch.startPage, batch.endPage);
 
     const heading = document.createElement("h3");
-    heading.textContent = t("progress.pages", {
-      pageRange: formatPageRange(batch.startPage, batch.endPage),
+    heading.textContent = t("batch.pages", {
+      range: formatPageRange(batch.startPage, batch.endPage),
     });
 
     const list = document.createElement("ul");
@@ -341,8 +323,8 @@ function renderErrors() {
     item.className = "error-item";
 
     const text = document.createElement("p");
-    text.textContent = t("errors.failedRow", {
-      pageRange: formatPageRange(batch.startPage, batch.endPage),
+    text.textContent = t("errors.pagesFailed", {
+      range: formatPageRange(batch.startPage, batch.endPage),
       error: batch.error || t("errors.batchFailed"),
     });
 
@@ -370,11 +352,10 @@ function renderClarify() {
   const pageRange = formatPageRange(batch.startPage, batch.endPage);
   const draft = String(batch.clarifyDraft || "").trim();
   els.clarifySection.hidden = false;
-  els.clarifyMeta.textContent = t("clarify.pages", { pageRange });
+  els.clarifyMeta.textContent = t("clarify.pages", { range: pageRange });
   els.clarifyDraftWrap.hidden = !draft;
   els.clarifyDraft.textContent = draft;
-  els.clarifyQuestion.textContent =
-    batch.clarifyQuestion || t("clarify.missingQuestion");
+  els.clarifyQuestion.textContent = batch.clarifyQuestion || t("clarify.missingQuestion");
 
   const key = `${batch.startPage}-${batch.endPage}-${batch.clarifyQuestion}-${draft}`;
   if (key !== state.lastClarifyKey) {
@@ -413,12 +394,12 @@ async function appendBlankPagePreview(pageNumber, bytes) {
   try {
     const canvas = await renderPageCanvas(bytes);
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", t("blank.ariaLabel", { page: pageNumber }));
+    canvas.setAttribute("aria-label", t("blank.scanAria", { page: pageNumber }));
     figure.append(canvas, fallback);
   } catch {
     const missing = document.createElement("p");
     missing.className = "hint";
-    missing.textContent = t("blank.drawFail");
+    missing.textContent = t("blank.couldNotDraw");
     figure.append(missing, fallback);
   }
   els.blankPages.append(figure);
@@ -436,7 +417,7 @@ async function loadBlankPreviews(batch) {
   try {
     const pdfBytes = batch.bytes || state.sourceBytes;
     if (!pdfBytes) {
-      throw new Error(t("blank.noPdf"));
+      throw new Error(t("blank.pdfGone"));
     }
     const pages = await extractPagePdfs(pdfBytes, batch.startPage, batch.endPage);
     if (token !== state.blankPreviewToken) {
@@ -459,7 +440,7 @@ async function loadBlankPreviews(batch) {
     els.blankPages.replaceChildren();
     const fail = document.createElement("p");
     fail.className = "hint";
-    fail.textContent = err?.message || t("blank.renderFail");
+    fail.textContent = err?.message || t("blank.renderFailed");
     els.blankPages.append(fail);
   }
 }
@@ -486,7 +467,7 @@ function renderBlankReview() {
 
   const pageRange = formatPageRange(batch.startPage, batch.endPage);
   els.blankSection.hidden = false;
-  els.blankMeta.textContent = t("blank.pages", { pageRange });
+  els.blankMeta.textContent = t("blank.pages", { range: pageRange });
 
   const key = `${batch.startPage}-${batch.endPage}`;
   if (key !== state.lastBlankKey) {
@@ -505,7 +486,7 @@ function pauseForBlankReview(batch, pageRange) {
   batch.clarifyMarker = "";
   batch.skippedBlank = false;
   setAlert("");
-  setStatus("status.pausedBlank", { pageRange });
+  setStatus("status.pausedBlank", { range: pageRange });
   render();
 }
 
@@ -517,11 +498,11 @@ function renderDownloads() {
 }
 
 function render() {
-  refreshStatusAndAlert();
   if (state.fileName) {
-    const pages =
-      state.pageCount === 1 ? t("form.pageOne") : t("form.pageMany", { count: state.pageCount });
-    els.fileMeta.textContent = t("form.fileMeta", { fileName: state.fileName, pages });
+    els.fileMeta.textContent =
+      state.pageCount === 1
+        ? t("file.onePage", { fileName: state.fileName })
+        : t("file.pages", { fileName: state.fileName, count: state.pageCount });
   } else {
     els.fileMeta.textContent = t("form.noFile");
   }
@@ -532,6 +513,21 @@ function render() {
   renderClarify();
   renderErrors();
   renderDownloads();
+}
+
+function refreshUi() {
+  applyTranslations();
+  populateModelSelect();
+  syncThemeToggle();
+  refreshStatus();
+  refreshAlert();
+  if (state.batches.some((batch) => batch.status === "blank")) {
+    state.lastBlankKey = "";
+  }
+  render();
+  if (els.localeSelect) {
+    els.localeSelect.value = getLocale();
+  }
 }
 
 function resetBatchesFromRanges(ranges) {
@@ -556,7 +552,7 @@ function resetBatchesFromRanges(ranges) {
 
 function planFromLoadedPdf() {
   if (!state.sourceBytes || !state.pageCount) {
-    setAlert("errors.choosePdfFirst", {});
+    setAlert("alert.choosePdfFirst");
     return false;
   }
   const preferred = getPreferredBatchSize();
@@ -565,9 +561,9 @@ function planFromLoadedPdf() {
   const count = state.batches.length;
   setAlert("");
   if (count === 1) {
-    setStatus("status.plannedOne", { pageCount: state.pageCount });
+    setStatus("status.plannedOne", { count: state.pageCount });
   } else {
-    setStatus("status.plannedMany", { count, pageCount: state.pageCount });
+    setStatus("status.plannedMany", { batches: count, count: state.pageCount });
   }
   render();
   return true;
@@ -575,11 +571,11 @@ function planFromLoadedPdf() {
 
 async function loadPdfFile(file) {
   if (!file) {
-    setAlert("errors.choosePdfFile", {});
+    setAlert("alert.choosePdf");
     return;
   }
   if (file.type && file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-    setAlert("errors.notPdf", {});
+    setAlert("alert.notPdf");
     return;
   }
 
@@ -589,7 +585,7 @@ async function loadPdfFile(file) {
     state.pageCount = info.pageCount;
     state.sourceBytes = info.bytes;
     if (!state.pageCount) {
-      setAlert("errors.noPages", {});
+      setAlert("alert.noPages");
       state.batches = [];
       render();
       return;
@@ -597,9 +593,9 @@ async function loadPdfFile(file) {
     planFromLoadedPdf();
   } catch (err) {
     if (err?.message) {
-      setAlert(err.message);
+      setAlert("alert.raw", { raw: err.message });
     } else {
-      setAlert("errors.readPdf", {});
+      setAlert("alert.couldNotRead");
     }
   }
 }
@@ -653,17 +649,17 @@ async function runAdaptation({ retryOnly = null } = {}) {
   const apiKey = getApiKey();
   const model = getModel();
   if (!apiKey) {
-    setAlert("errors.needApiKey", {});
+    setAlert("alert.needKey");
     els.apiKey.focus();
     return;
   }
   if (!model) {
-    setAlert("errors.needModel", {});
+    setAlert("alert.needModel");
     (els.model.value === CUSTOM_MODEL_VALUE ? els.customModel : els.model).focus();
     return;
   }
   if (!state.sourceBytes) {
-    setAlert("errors.needPdf", {});
+    setAlert("alert.needPdf");
     return;
   }
 
@@ -705,7 +701,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
         batch.locale = getLocale();
       }
       const pageRange = formatPageRange(batch.startPage, batch.endPage);
-      setStatus("status.batchProgress", { index: index + 1, total, pageRange });
+      setStatus("status.batchProgress", { index: index + 1, total, range: pageRange });
       render();
 
       for (;;) {
@@ -725,10 +721,10 @@ async function runAdaptation({ retryOnly = null } = {}) {
               batch.status = "retrying";
               batch.error = "";
               setAlert("");
-              setStatus("status.batchRetrying", {
+              setStatus("status.batchRetry", {
                 index: index + 1,
                 total,
-                detail: formatRetryingStatus(pageRange, waitMs, httpStatus),
+                message: formatRetryingStatus(pageRange, waitMs, httpStatus),
               });
               render();
             },
@@ -743,7 +739,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
             batch.status = "clarify";
             batch.error = "";
             setAlert("");
-            setStatus("status.pausedClarify", { pageRange });
+            setStatus("status.pausedClarify", { range: pageRange });
             render();
             return;
           }
@@ -770,10 +766,10 @@ async function runAdaptation({ retryOnly = null } = {}) {
             batch.status = "retrying";
             batch.error = "";
             setAlert("");
-            setStatus("status.batchRetrying", {
+            setStatus("status.batchRetry", {
               index: index + 1,
               total,
-              detail: outcome.statusMessage,
+              message: outcome.statusMessage,
             });
             render();
             continue;
@@ -782,12 +778,12 @@ async function runAdaptation({ retryOnly = null } = {}) {
           batch.error = outcome.error;
           if (outcome.kind === "cancel") {
             setAlert("");
-            setStatus("runControl.cancelled");
+            setStatus("status.raw", { raw: outcome.statusMessage });
             render();
             return;
           }
-          setAlert(outcome.alertMessage);
-          setStatus("runControl.stoppedStatus", { pageRange });
+          setAlert("alert.raw", { raw: outcome.alertMessage });
+          setStatus("status.raw", { raw: outcome.statusMessage });
           render();
           return;
         }
@@ -798,16 +794,16 @@ async function runAdaptation({ retryOnly = null } = {}) {
     const done = completedBatches().length;
     const failed = state.batches.filter((batch) => batch.status === "error").length;
     if (failed) {
-      setStatus("status.finishedFailed", { done, total });
+      setStatus("status.completedWithErrors", { done, total });
     } else {
-      setStatus("status.finishedOk", { done, total });
+      setStatus("status.finished", { done, total });
     }
     render();
   } catch (err) {
     if (err?.message) {
-      setAlert(err.message);
+      setAlert("alert.raw", { raw: err.message });
     } else {
-      setAlert("errors.splitPdf", {});
+      setAlert("alert.couldNotSplit");
     }
     setStatus("status.stopped");
   } finally {
@@ -840,7 +836,7 @@ function skipBlankBatch() {
   }
   const batch = state.batches.find((item) => item.status === "blank");
   if (!batch) {
-    setAlert("errors.noBlankReview", {});
+    setAlert("alert.noBlankReview");
     return;
   }
   const pageRange = formatPageRange(batch.startPage, batch.endPage);
@@ -854,14 +850,14 @@ function skipBlankBatch() {
   setAlert("");
   const pending = state.batches.some((item) => item.status === "pending");
   if (pending) {
-    setStatus("status.skippedContinue", { pageRange });
+    setStatus("status.skippedBlankContinue", { range: pageRange });
     render();
     runAdaptation();
     return;
   }
   const done = completedBatches().length;
   const total = state.batches.length;
-  setStatus("status.skippedFinished", { pageRange, done, total });
+  setStatus("status.skippedBlankFinished", { range: pageRange, done, total });
   render();
 }
 
@@ -879,12 +875,12 @@ function continueClarify() {
   }
   const batch = state.batches.find((item) => item.status === "clarify");
   if (!batch) {
-    setAlert("errors.noClarify", {});
+    setAlert("alert.noClarify");
     return;
   }
   const answer = els.clarifyAnswer.value.trim();
   if (!answer) {
-    setAlert("errors.needClarifyAnswer", {});
+    setAlert("alert.typeAnswer");
     els.clarifyAnswer.focus();
     return;
   }
@@ -952,7 +948,6 @@ function bindEvents() {
   });
   els.themeToggle.addEventListener("click", () => {
     toggleTheme();
-    syncThemeToggleLabel();
   });
   els.pdfFile.addEventListener("change", () => {
     const file = els.pdfFile.files?.[0];
@@ -1015,14 +1010,9 @@ function bindEvents() {
 }
 
 cacheElements();
+onLocaleChange(refreshUi);
 initTheme();
-onLocaleChange(() => {
-  els.localeSelect.value = getLocale();
-  populateModelSelect();
-  syncThemeToggleLabel();
-  state.lastBlankKey = "";
-  render();
-});
-initI18n();
 restoreApiKey();
 bindEvents();
+setLocale(detectLocale());
+refreshUi();

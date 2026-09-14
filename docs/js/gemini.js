@@ -1,7 +1,8 @@
 /** Gemini generateContent client. Calls Google directly from the browser. */
 
-import { EMPTY_BATCH_MESSAGE } from "./blank-pages.js";
 import { t } from "./i18n.js";
+import { en } from "./locales/en.js";
+import { EMPTY_BATCH_MESSAGE } from "./blank-pages.js";
 import {
   buildInterpretationPrompt,
   buildStyleRules,
@@ -19,21 +20,11 @@ export const DEFAULT_MODEL = "gemini-3.8-flash";
 /** Matches Google's default thinking level for 3.8 Flash; enough for faithful OCR. */
 export const GEMINI_3_THINKING_LEVEL = "medium";
 
-function modelOption(value, labelKey) {
-  return {
-    value,
-    labelKey,
-    get label() {
-      return t(labelKey);
-    },
-  };
-}
-
 export const MODEL_OPTIONS = [
-  modelOption("gemini-3.8-flash", "gemini.modelFlash38"),
-  modelOption("gemini-2.5-flash", "gemini.modelFlash25"),
-  modelOption("gemini-2.5-pro", "gemini.modelPro25"),
-  modelOption("gemini-2.0-flash", "gemini.modelFlash20"),
+  { value: "gemini-3.8-flash", get label() { return t("gemini.modelFlash38"); } },
+  { value: "gemini-2.5-flash", get label() { return t("gemini.model25Flash"); } },
+  { value: "gemini-2.5-pro", get label() { return t("gemini.model25Pro"); } },
+  { value: "gemini-2.0-flash", get label() { return t("gemini.model20Flash"); } },
 ];
 
 /** Rate limits are transient; keep retrying the current batch much longer than a handful of 429s. */
@@ -41,11 +32,10 @@ export const RETRYABLE_MAX_RETRIES = 40;
 export const RETRY_BASE_MS = 1000;
 export const RETRY_CAP_MS = 60_000;
 
-export const RATE_LIMIT_RETRYING = "Rate limited. Waiting, then retrying this batch.";
-export const RATE_LIMIT_EXHAUSTED = "This batch was rate limited after retries.";
-export const UNAVAILABLE_RETRYING =
-  "Gemini is temporarily unavailable. Waiting, then retrying this batch.";
-export const UNAVAILABLE_EXHAUSTED = "Gemini was temporarily unavailable after retries.";
+export const RATE_LIMIT_RETRYING = en["gemini.rateLimitRetrying"];
+export const RATE_LIMIT_EXHAUSTED = en["gemini.rateLimitExhausted"];
+export const UNAVAILABLE_RETRYING = en["gemini.unavailableRetrying"];
+export const UNAVAILABLE_EXHAUSTED = en["gemini.unavailableExhausted"];
 
 const DEFAULT_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -142,7 +132,7 @@ export function describeGeminiError(payload, status, options = {}) {
     return exhausted ? t("gemini.unavailableExhausted") : t("gemini.unavailableRetrying");
   }
   if (status === 401 || status === 403 || /API key/i.test(message)) {
-    return message || t("gemini.apiKeyRejected");
+    return message || t("gemini.keyRejected");
   }
   if (payload?.promptFeedback?.blockReason) {
     return t("gemini.blocked", { reason: payload.promptFeedback.blockReason });
@@ -251,7 +241,9 @@ export async function transcribeBatch({
       if (err?.name === "AbortError") {
         throw err;
       }
-      lastError = geminiError(t("gemini.unreachable"), { retryable: attempt < maxRetries });
+      lastError = geminiError(t("gemini.unreachable"), {
+        retryable: attempt < maxRetries,
+      });
       if (attempt < maxRetries) {
         await sleepFn(1000 * (attempt + 1), signal);
         continue;
@@ -294,10 +286,10 @@ export async function transcribeBatch({
 
     const text = stripModelFences(extractText(payload));
     if (!text) {
-      throw geminiError(EMPTY_BATCH_MESSAGE);
+      throw geminiError(t("gemini.empty"));
     }
     return text;
   }
 
-  throw lastError || geminiError(t("gemini.failedRetries"));
+  throw lastError || geminiError(t("gemini.failedAfterRetries"));
 }

@@ -1,70 +1,68 @@
-/** Manual light/dark theme with localStorage persistence. */
+/** Persist and apply light/dark theme for the adapter UI. */
 
-export const THEME_STORAGE_KEY = "textbook-adapter-theme";
+import { t } from "./i18n.js";
 
-function readStorage(key) {
+export const THEME_KEY = "textbook-adapter-theme";
+
+export function detectTheme() {
   try {
-    return globalThis.localStorage?.getItem(key) ?? null;
+    const stored = localStorage.getItem(THEME_KEY);
+    if (stored === "dark" || stored === "light") {
+      return stored;
+    }
   } catch {
-    return null;
+    // Ignore missing storage (private mode, Node tests).
   }
-}
-
-function writeStorage(key, value) {
-  try {
-    globalThis.localStorage?.setItem(key, value);
-  } catch {
-    // Private mode or missing storage.
+  if (typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches) {
+    return "dark";
   }
-}
-
-export function prefersDark() {
-  return Boolean(globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.matches);
-}
-
-export function readStoredTheme() {
-  const stored = readStorage(THEME_STORAGE_KEY);
-  if (stored === "dark" || stored === "light") {
-    return stored;
-  }
-  return null;
-}
-
-export function resolveTheme() {
-  return readStoredTheme() || (prefersDark() ? "dark" : "light");
+  return "light";
 }
 
 export function getTheme() {
-  const current =
-    typeof document === "undefined" ? "" : document.documentElement.dataset.theme;
-  if (current === "dark" || current === "light") {
-    return current;
+  if (typeof document === "undefined") {
+    return "light";
   }
-  return resolveTheme();
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
-export function applyTheme(theme) {
+export function setTheme(theme) {
   const next = theme === "dark" ? "dark" : "light";
   if (typeof document !== "undefined") {
     document.documentElement.dataset.theme = next;
-    const button = document.getElementById("theme-toggle");
-    if (button) {
-      button.setAttribute("aria-pressed", next === "dark" ? "true" : "false");
-    }
   }
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    // Ignore missing storage.
+  }
+  syncThemeToggle();
   return next;
 }
 
-export function persistTheme(theme) {
-  writeStorage(THEME_STORAGE_KEY, theme === "dark" ? "dark" : "light");
+export function toggleTheme() {
+  return setTheme(getTheme() === "dark" ? "light" : "dark");
 }
 
-export function toggleTheme() {
-  const next = getTheme() === "dark" ? "light" : "dark";
-  persistTheme(next);
-  return applyTheme(next);
+export function syncThemeToggle() {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const button = document.getElementById("theme-toggle");
+  if (!button) {
+    return;
+  }
+  const dark = getTheme() === "dark";
+  button.setAttribute("aria-pressed", dark ? "true" : "false");
+  button.textContent = t("toolbar.darkMode");
 }
 
 export function initTheme() {
-  return applyTheme(resolveTheme());
+  const current =
+    typeof document === "undefined" ? "" : document.documentElement.dataset.theme;
+  if (current !== "dark" && current !== "light") {
+    setTheme(detectTheme());
+    return;
+  }
+  syncThemeToggle();
 }
