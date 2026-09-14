@@ -133,10 +133,6 @@ export const en = {
   "batch.issues": "{count} issues",
   "batch.emDash": "—",
 
-  "issues.heading": "Style issues",
-  "issues.hint":
-    "After a batch finishes, forbidden characters such as ampersand, asterisk, number-sign, square brackets, and braces are listed here. They do not stop the run. Click a count in Progress to jump to that range. Unreadable words appear as (unclear) in the downloaded text, not in this list.",
-
   "file.onePage": "{fileName} · 1 page",
   "file.pages": "{fileName} · {count} pages",
 

@@ -26,6 +26,16 @@ BAD: a leading number-sign heading when the book uses a plain label
 GOOD: a title-case or all-caps heading that matches the book, then body text
 GOOD: `Tip:` `Note:` `FYI:` `Directions:` `Examples` `Caption:` on their own lines when the book prints them that way
 
+## Emphasis
+Keep italic, bold, and underlined print from the source. Use underscore markdown and an underline tag so emphasis does not need asterisk.
+
+BAD: dropping italics, bold, or underlines that appear in the print
+BAD: `*italic*` or `**bold**` with asterisks
+BAD: adding emphasis the book does not print
+GOOD: `_italic words_`
+GOOD: `__bold words__`
+GOOD: `<u>underlined words</u>` when the book underlines those words
+
 ## Numbers, dates, and phones
 BAD: `1000 students` when the book shows a multi-digit quantity meant for reading aloud
 GOOD: `1,000 students` when comma grouping aids comprehension

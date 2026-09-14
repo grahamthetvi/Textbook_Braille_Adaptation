@@ -21,6 +21,9 @@ test("STYLE_RULES is screen-reader agent copy, not Grade 2 as the primary goal",
   assert.match(STYLE_RULES, /Nested and indented lists are allowed/);
   assert.match(STYLE_RULES, /\(unclear\)/);
   assert.match(STYLE_RULES, /Do not return an empty reply when printed lesson text is visible/);
+  assert.match(STYLE_RULES, /_italics_/);
+  assert.match(STYLE_RULES, /__bold__/);
+  assert.match(STYLE_RULES, /<u>underlined<\/u>/);
   assert.doesNotMatch(STYLE_RULES, /later Grade 2 braille/);
   assert.doesNotMatch(STYLE_RULES, /Grade 2 braille translation/);
   assert.doesNotMatch(STYLE_RULES, /\[unclear\]/);

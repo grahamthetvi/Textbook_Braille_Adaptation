@@ -16,7 +16,7 @@ After the user answers, transcribe the complete batch. If you still cannot, end 
 Formatting
 Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines.
 Nested and indented lists are allowed. Number or letter questions when they sit under a numbered item.
-Avoid square brackets, braces, asterisk, and number-sign unless those characters appear in the source. Do not use markdown hash headings. Write headings as plain title lines matching the book's hierarchy.
+Avoid square brackets, braces, asterisk, and number-sign unless those characters appear in the source. Do not use markdown hash headings. Write headings as plain title lines matching the book's hierarchy. Preserve italic, bold, and underlined print as _italics_, __bold__, and <u>underlined</u>. Do not use asterisk for emphasis. Do not add emphasis the book does not print.
 Default math: plain text only. Write plus, minus, times, divided by, equals, and spoken-friendly fractions. Do not use LaTeX unless math-LaTeX mode is on.
 Use simple markdown pipe tables when the book shows tabular data. Do not insert a header-separator row of hyphens; three hyphens on their own line are a section break, not a table rule.
 Use labels such as Tip: Note: FYI: Directions: Examples Caption: on their own lines when the book prints them that way.
@@ -145,7 +145,7 @@ export function buildInterpretationPrompt(pageRange, options = {}) {
     : "";
   return `Produce screen-reader-accessible text from these scanned textbook pages. Do not output braille, contractions, or braille ASCII.
 
-Follow the system instruction. Transcribe faithfully. If you cannot reliably make the content accessible, end with a ${lang.clarifyMarker} block. Prefer a ${lang.clarifyMarker}-only reply. Nested lists are allowed. Number or letter questions when they sit under a numbered item. Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. Avoid square brackets, braces, asterisk, and number-sign unless they appear in the source. Do not use markdown hash headings. Use ${lang.unclearToken} for unreadable words. Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
+Follow the system instruction. Transcribe faithfully. If you cannot reliably make the content accessible, end with a ${lang.clarifyMarker} block. Prefer a ${lang.clarifyMarker}-only reply. Nested lists are allowed. Number or letter questions when they sit under a numbered item. Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. Avoid square brackets, braces, asterisk, and number-sign unless they appear in the source. Do not use markdown hash headings. Preserve italic, bold, and underlined print as _italics_, __bold__, and <u>underlined</u>. Use ${lang.unclearToken} for unreadable words. Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
 ${languageBlock}${mathLine}
 
 Output markdown or plain text only when completing the batch. No preamble, no code fences.

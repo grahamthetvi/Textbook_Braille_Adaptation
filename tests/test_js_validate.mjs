@@ -29,6 +29,11 @@ test("(unclear) is allowed and [unclear] is not", () => {
   assert.ok(issues.some((item) => item.includes("']'")));
 });
 
+test("underscore emphasis and underline tags are allowed", () => {
+  const text = "Keep _italic_, __bold__, and <u>underlined</u> words.";
+  assert.deepEqual(validateMarkdown(text), []);
+});
+
 test("nested numbered and lettered lists are allowed", () => {
   const text = "1. outer item\n  a. nested question\n  b. second question\n2. next item\n";
   assert.deepEqual(validateMarkdown(text), []);

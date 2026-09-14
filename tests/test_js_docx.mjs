@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { combinedMarkdown } from "../docs/js/download.js";
-import { buildDocxFiles, escapeXml, markdownToDocumentXml } from "../docs/js/docx.js";
+import { buildDocxFiles, escapeXml, markdownToDocumentXml, parseInlineRuns } from "../docs/js/docx.js";
 
 test("escapeXml encodes characters that would break OOXML", () => {
   assert.equal(escapeXml("A & B <C>"), "A &amp; B &lt;C&gt;");
@@ -12,6 +12,34 @@ test("markdownToDocumentXml writes each line as a paragraph", () => {
   assert.match(xml, /<w:t xml:space="preserve">Title<\/w:t>/);
   assert.match(xml, /<w:t xml:space="preserve">Tip: Read this\.<\/w:t>/);
   assert.match(xml, /<w:p\/>/);
+});
+
+test("parseInlineRuns keeps italic, bold, and underline", () => {
+  assert.deepEqual(parseInlineRuns("Read _Careful_ and __Note__ then <u>this</u>."), [
+    { text: "Read ", bold: false, italic: false, underline: false },
+    { text: "Careful", bold: false, italic: true, underline: false },
+    { text: " and ", bold: false, italic: false, underline: false },
+    { text: "Note", bold: true, italic: false, underline: false },
+    { text: " then ", bold: false, italic: false, underline: false },
+    { text: "this", bold: false, italic: false, underline: true },
+    { text: ".", bold: false, italic: false, underline: false },
+  ]);
+});
+
+test("parseInlineRuns leaves hyphens and math spans alone", () => {
+  assert.deepEqual(parseInlineRuns("Joyner-Kersee and \\(x_1\\)"), [
+    { text: "Joyner-Kersee and \\(x_1\\)", bold: false, italic: false, underline: false },
+  ]);
+});
+
+test("markdownToDocumentXml maps emphasis to Word run properties", () => {
+  const xml = markdownToDocumentXml("_italic_ __bold__ <u>under</u>");
+  assert.match(xml, /<w:i\/>/);
+  assert.match(xml, /<w:b\/>/);
+  assert.match(xml, /<w:u w:val="single"\/>/);
+  assert.match(xml, />italic</);
+  assert.match(xml, />bold</);
+  assert.match(xml, />under</);
 });
 
 test("section rules become page breaks", () => {

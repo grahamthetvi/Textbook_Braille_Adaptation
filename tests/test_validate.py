@@ -48,6 +48,11 @@ class ValidateAccessibleTests(unittest.TestCase):
         self.assertTrue(any("'['" in item for item in issues))
         self.assertTrue(any("']'" in item for item in issues))
 
+    def test_underscore_emphasis_and_underline_tags_are_allowed(self):
+        path = Path("sample.md")
+        text = "Keep _italic_, __bold__, and <u>underlined</u> words."
+        self.assertEqual(_check_forbidden_chars(text, path), [])
+
     def test_nested_lists_are_allowed(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "nested.md"

@@ -11,7 +11,7 @@ import { validateMarkdown } from "./validate.js";
 import { downloadCombined, downloadDocx, downloadZip } from "./download.js";
 import { planBatches, padPage } from "./batches.js";
 import { applyTranscriptionError, formatPageRange, formatRetryingStatus } from "./run-control.js";
-import { batchesWithStyleIssues, excerptForIssue, issueGroupId } from "./issues.js";
+import { excerptForIssue, issueGroupId } from "./issues.js";
 import {
   applyTranslations,
   detectLocale,
@@ -99,8 +99,6 @@ function cacheElements() {
   els.blankPages = document.getElementById("blank-pages");
   els.blankSkipBtn = document.getElementById("blank-skip-btn");
   els.blankRetryBtn = document.getElementById("blank-retry-btn");
-  els.issueSection = document.getElementById("issue-section");
-  els.issueList = document.getElementById("issue-list");
 }
 
 function getPreferredBatchSize() {
@@ -258,8 +256,10 @@ function renderBatchList() {
       if (batch.skippedBlank) {
         issues.textContent = t("batch.skippedBlank");
       } else if (batch.issues.length) {
+        const groupId = issueGroupId(batch.startPage, batch.endPage);
+        row.id = groupId;
         const link = document.createElement("a");
-        link.href = `#${issueGroupId(batch.startPage, batch.endPage)}`;
+        link.href = `#${groupId}`;
         const count = batch.issues.length;
         link.textContent = count === 1 ? t("batch.issueOne") : t("batch.issues", { count });
         issues.append(link);
@@ -271,46 +271,32 @@ function renderBatchList() {
     }
 
     row.append(range, status, issues);
+    if (batch.status === "done" && !batch.skippedBlank && batch.issues.length) {
+      row.append(issueDetailList(batch));
+    }
     els.batchList.append(row);
   }
 }
 
-function renderIssues() {
-  const flagged = batchesWithStyleIssues(state.batches);
-  els.issueList.replaceChildren();
-  els.issueSection.hidden = flagged.length === 0;
-
-  for (const batch of flagged) {
-    const group = document.createElement("li");
-    group.className = "issue-group";
-    group.id = issueGroupId(batch.startPage, batch.endPage);
-
-    const heading = document.createElement("h3");
-    heading.textContent = t("batch.pages", {
-      range: formatPageRange(batch.startPage, batch.endPage),
-    });
-
-    const list = document.createElement("ul");
-    list.className = "issue-detail-list";
-    for (const message of batch.issues) {
-      const item = document.createElement("li");
-      const text = document.createElement("p");
-      text.className = "issue-message";
-      text.textContent = message;
-      item.append(text);
-      const excerpt = excerptForIssue(batch.markdown, message);
-      if (excerpt) {
-        const quote = document.createElement("p");
-        quote.className = "issue-excerpt";
-        quote.textContent = excerpt;
-        item.append(quote);
-      }
-      list.append(item);
+function issueDetailList(batch) {
+  const list = document.createElement("ul");
+  list.className = "issue-detail-list";
+  for (const message of batch.issues) {
+    const item = document.createElement("li");
+    const text = document.createElement("p");
+    text.className = "issue-message";
+    text.textContent = message;
+    item.append(text);
+    const excerpt = excerptForIssue(batch.markdown, message);
+    if (excerpt) {
+      const quote = document.createElement("p");
+      quote.className = "issue-excerpt";
+      quote.textContent = excerpt;
+      item.append(quote);
     }
-
-    group.append(heading, list);
-    els.issueList.append(group);
+    list.append(item);
   }
+  return list;
 }
 
 function renderErrors() {
@@ -508,7 +494,6 @@ function render() {
   }
   renderProgress();
   renderBatchList();
-  renderIssues();
   renderBlankReview();
   renderClarify();
   renderErrors();

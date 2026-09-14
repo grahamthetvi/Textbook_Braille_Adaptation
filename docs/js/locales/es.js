@@ -135,10 +135,6 @@ export const es = {
   "batch.issues": "{count} problemas",
   "batch.emDash": "—",
 
-  "issues.heading": "Problemas de estilo",
-  "issues.hint":
-    "Cuando termina un lote, aquí aparecen caracteres prohibidos como el ampersand, el asterisco, el numeral, los corchetes y las llaves. No detienen la ejecución. Pulsa un recuento en Progreso para ir a ese rango. Las palabras ilegibles aparecen como (poco claro) en el texto descargado, no en esta lista.",
-
   "file.onePage": "{fileName} · 1 página",
   "file.pages": "{fileName} · {count} páginas",
 
