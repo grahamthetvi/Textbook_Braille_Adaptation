@@ -1,11 +1,12 @@
 /** Split a source PDF into batch PDFs in the browser using pdf-lib. */
 
 import { planBatches, batchPdfName, batchFileStem } from "./batches.js";
+import { t } from "./i18n.js";
 
 function requirePdfLib() {
   const lib = window.PDFLib;
   if (!lib?.PDFDocument) {
-    throw new Error("pdf-lib failed to load. Check docs/vendor/pdf-lib.min.js.");
+    throw new Error(t("pdf.libFailed"));
   }
   return lib;
 }

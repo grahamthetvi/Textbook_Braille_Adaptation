@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { before, test } from "node:test";
 import {
   RATE_LIMIT_EXHAUSTED,
   RATE_LIMIT_RETRYING,
   UNAVAILABLE_RETRYING,
   geminiError,
 } from "../docs/js/gemini.js";
+import { setLocale } from "../docs/js/i18n.js";
 import {
   CANCELLED_STATUS,
   REMAINING_NOT_SENT,
@@ -18,6 +19,10 @@ import {
   isRetryableTranscriptionError,
   runPendingBatches,
 } from "../docs/js/run-control.js";
+
+before(() => {
+  setLocale("en");
+});
 
 function pending(startPage, endPage) {
   return { startPage, endPage, status: "pending", markdown: "", error: "" };

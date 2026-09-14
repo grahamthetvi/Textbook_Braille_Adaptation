@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { before, test } from "node:test";
 import {
   DEFAULT_MODEL,
   EMPTY_BATCH_MESSAGE,
@@ -17,6 +17,7 @@ import {
   transcribeBatch,
   buildTranscribeContents,
 } from "../docs/js/gemini.js";
+import { setLocale } from "../docs/js/i18n.js";
 import {
   LATEX_MATH_INSTRUCTION,
   PLAIN_MATH_INSTRUCTION,
@@ -24,6 +25,10 @@ import {
   parseClarify,
 } from "../docs/js/prompt.js";
 import { stripModelFences } from "../docs/js/validate.js";
+
+before(() => {
+  setLocale("en");
+});
 
 test("default Google API model is gemini-3.8-flash", () => {
   assert.equal(DEFAULT_MODEL, "gemini-3.8-flash");

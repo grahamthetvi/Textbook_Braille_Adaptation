@@ -1,8 +1,10 @@
 /** Detect empty Gemini output and write a skip note after visual review. */
 
 import { padPage } from "./batches.js";
+import { messageMatches } from "./i18n.js";
+import { en } from "./locales/en.js";
 
-export const EMPTY_BATCH_MESSAGE = "Gemini returned empty text for this batch.";
+export const EMPTY_BATCH_MESSAGE = en["gemini.empty"];
 
 /** Markdown left in the download when the user confirms a batch was blank. */
 export function skippedBlankMarkdown(startPage, endPage) {
@@ -26,7 +28,7 @@ export function isBlankTranscription(text) {
 }
 
 export function isBlankBatchError(err) {
-  return Boolean(err) && String(err.message || "") === EMPTY_BATCH_MESSAGE;
+  return Boolean(err) && messageMatches(String(err.message || ""), "gemini.empty");
 }
 
 export function pagePreviewFileName(pageNumber) {

@@ -2,10 +2,11 @@
 
 import { batchFileStem } from "./batches.js";
 import { buildDocxFiles } from "./docx.js";
+import { t } from "./i18n.js";
 
 function requireJsZip() {
   if (!window.JSZip) {
-    throw new Error("JSZip failed to load. Check docs/vendor/jszip.min.js.");
+    throw new Error(t("pdf.jszipFailed"));
   }
   return window.JSZip;
 }

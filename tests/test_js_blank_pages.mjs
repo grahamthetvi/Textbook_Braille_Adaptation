@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { before, test } from "node:test";
 import {
   EMPTY_BATCH_MESSAGE,
   isBlankBatchError,
@@ -8,7 +8,12 @@ import {
   skippedBlankMarkdown,
 } from "../docs/js/blank-pages.js";
 import { geminiError } from "../docs/js/gemini.js";
+import { setLocale } from "../docs/js/i18n.js";
 import { validateMarkdown } from "../docs/js/validate.js";
+
+before(() => {
+  setLocale("en");
+});
 
 test("empty and whitespace-only transcriptions are blank", () => {
   assert.equal(isBlankTranscription(""), true);
