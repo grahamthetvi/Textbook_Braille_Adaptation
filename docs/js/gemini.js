@@ -2,6 +2,7 @@
 
 import { t } from "./i18n.js";
 import { en } from "./locales/en.js";
+import { EMPTY_BATCH_MESSAGE } from "./blank-pages.js";
 import {
   buildInterpretationPrompt,
   buildStyleRules,
@@ -9,6 +10,8 @@ import {
   pageRangeLabel,
 } from "./prompt.js";
 import { stripModelFences } from "./validate.js";
+
+export { EMPTY_BATCH_MESSAGE };
 
 /** Google Gemini API model id. Do not use Cursor slugs such as gemini-3.8-flash-medium. */
 export const DEFAULT_MODEL = "gemini-3.8-flash";

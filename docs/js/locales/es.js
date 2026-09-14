@@ -56,6 +56,22 @@ export const es = {
   "clarify.pages": "páginas {range}",
   "clarify.missingQuestion": "Gemini hizo una pregunta pero no incluyó el texto.",
 
+  "blank.heading": "Salida en blanco — revisa las páginas originales",
+  "blank.hint":
+    "Gemini no devolvió texto para este lote. Puede que las páginas de origen estén en blanco, o que el modelo no haya visto el contenido impreso. Compara las páginas originales y luego omítelas si están en blanco o reintenta si tienen texto de la lección. Los lotes pendientes restantes esperan hasta que elijas.",
+  "blank.skip": "Omitir por estar en blanco",
+  "blank.retry": "Reintentar este lote",
+  "blank.pages": "páginas {range}",
+  "blank.sourcePage": "Página de origen {page}",
+  "blank.downloadPage": "Descargar página de origen {page}",
+  "blank.downloadSuffix": " si quieres el PDF original.",
+  "blank.couldNotDraw": "No se pudo dibujar esta página. Usa el enlace de descarga para inspeccionarla.",
+  "blank.loading": "Cargando las páginas originales…",
+  "blank.scanAria": "Escaneo original de la página de origen {page}",
+  "blank.pdfGone": "El PDF original ya no está disponible en esta sesión.",
+  "blank.renderFailed":
+    "No se pudieron mostrar las páginas originales. Omítelas si están en blanco, o reintenta si tienen contenido.",
+
   "progress.heading": "Progreso",
   "progress.batchesCompleted": "Lotes completados",
   "progress.batchStatus": "Estado de los lotes",
@@ -73,6 +89,12 @@ export const es = {
   "status.batchRetry": "Lote {index} de {total}. {message}",
   "status.pausedClarify":
     "En pausa en las páginas {range}. Gemini necesita una aclaración antes de poder terminar ese lote.",
+  "status.pausedBlank":
+    "En pausa en las páginas {range}. Gemini no devolvió texto. Compara las páginas originales y luego omítelas si están en blanco o reintenta si tienen contenido.",
+  "status.skippedBlankContinue":
+    "Se omitieron las páginas {range} por estar en blanco. Continuando con los lotes restantes.",
+  "status.skippedBlankFinished":
+    "Se omitieron las páginas {range} por estar en blanco. Se terminaron {done} de {total} lotes.",
   "status.completedWithErrors":
     "{done} de {total} lotes completados. Reintenta las filas fallidas o descarga lo que terminó.",
   "status.finished":
@@ -81,7 +103,7 @@ export const es = {
 
   "errors.heading": "Lotes fallidos",
   "errors.hint":
-    "Un lote fallido o una pregunta de aclaración detiene la ejecución. Los rangos pendientes restantes no se envían. Los límites de frecuencia esperan y reintentan el lote actual sin detenerse. Reintenta una fila fallida, responde una aclaración o Adaptar el libro para reanudar los lotes pendientes. Los lotes completados siguen pudiéndose descargar.",
+    "Un lote fallido, una pregunta de aclaración o una salida en blanco detienen la ejecución. Los rangos pendientes restantes no se envían. Los límites de frecuencia esperan y reintentan el lote actual sin detenerse. Reintenta una fila fallida, responde una aclaración, omite o reintenta una salida en blanco, o Adaptar el libro para reanudar los lotes pendientes. Los lotes completados siguen pudiéndose descargar.",
   "errors.raw": "{raw}",
   "errors.pagesFailed": "páginas {range}: {error}",
   "errors.batchFailed": "Este lote falló.",
@@ -102,6 +124,8 @@ export const es = {
   "batch.error": "error",
   "batch.retrying": "reintentando",
   "batch.clarify": "necesita aclaración",
+  "batch.blank": "revisar páginas originales",
+  "batch.skippedBlank": "omitido en blanco",
   "batch.issueOne": "1 problema",
   "batch.issues": "{count} problemas",
   "batch.emDash": "—",
@@ -120,6 +144,7 @@ export const es = {
   "alert.needPdf": "Suelta o elige primero un PDF de libro de texto.",
   "alert.couldNotSplit": "No se pudo dividir ese PDF.",
   "alert.noClarify": "No hay ningún lote esperando una aclaración.",
+  "alert.noBlankReview": "No hay ningún lote esperando una revisión de páginas en blanco.",
   "alert.typeAnswer": "Escribe una respuesta para que Gemini pueda terminar este lote.",
   "alert.raw": "{raw}",
 

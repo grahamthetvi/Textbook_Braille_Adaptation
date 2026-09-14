@@ -56,6 +56,22 @@ export const en = {
   "clarify.pages": "pages {range}",
   "clarify.missingQuestion": "Gemini asked a question but did not include the text.",
 
+  "blank.heading": "Blank output — check original pages",
+  "blank.hint":
+    "Gemini returned no text for this batch. That can mean the source pages are blank, or that the model missed printed content. Compare the original pages, then skip them if they are blank or retry if they have lesson text. Remaining pending batches wait until you choose.",
+  "blank.skip": "Skip as blank",
+  "blank.retry": "Retry this batch",
+  "blank.pages": "pages {range}",
+  "blank.sourcePage": "Source page {page}",
+  "blank.downloadPage": "Download source page {page}",
+  "blank.downloadSuffix": " if you want the original PDF.",
+  "blank.couldNotDraw": "Could not draw this page. Use the download link to inspect it.",
+  "blank.loading": "Loading original pages…",
+  "blank.scanAria": "Original scan of source page {page}",
+  "blank.pdfGone": "The original PDF is no longer available in this session.",
+  "blank.renderFailed":
+    "Could not render original pages. Skip if they are blank, or retry if they have content.",
+
   "progress.heading": "Progress",
   "progress.batchesCompleted": "Batches completed",
   "progress.batchStatus": "Batch status",
@@ -72,6 +88,12 @@ export const en = {
   "status.batchRetry": "Batch {index} of {total}. {message}",
   "status.pausedClarify":
     "Paused on pages {range}. Gemini needs a clarification before that batch can finish.",
+  "status.pausedBlank":
+    "Paused on pages {range}. Gemini returned no text. Compare the original pages, then skip if they are blank or retry if they have content.",
+  "status.skippedBlankContinue":
+    "Skipped pages {range} as blank. Continuing with remaining batches.",
+  "status.skippedBlankFinished":
+    "Skipped pages {range} as blank. Finished {done} of {total} batches.",
   "status.completedWithErrors":
     "{done} of {total} batches completed. Retry failed rows or download what finished.",
   "status.finished":
@@ -80,7 +102,7 @@ export const en = {
 
   "errors.heading": "Failed batches",
   "errors.hint":
-    "A failed batch or a clarification question stops the run. Remaining pending ranges are not sent. Rate limits wait and retry the current batch without stopping. Retry a failed row, answer a clarification, or Adapt book to resume pending batches. Completed batches stay downloadable.",
+    "A failed batch, a clarification question, or blank output stops the run. Remaining pending ranges are not sent. Rate limits wait and retry the current batch without stopping. Retry a failed row, answer a clarification, skip or retry blank output, or Adapt book to resume pending batches. Completed batches stay downloadable.",
   "errors.raw": "{raw}",
   "errors.pagesFailed": "pages {range}: {error}",
   "errors.batchFailed": "This batch failed.",
@@ -100,6 +122,8 @@ export const en = {
   "batch.error": "error",
   "batch.retrying": "retrying",
   "batch.clarify": "needs clarification",
+  "batch.blank": "check original pages",
+  "batch.skippedBlank": "skipped blank",
   "batch.issueOne": "1 issue",
   "batch.issues": "{count} issues",
   "batch.emDash": "—",
@@ -118,6 +142,7 @@ export const en = {
   "alert.needPdf": "Drop or choose a textbook PDF first.",
   "alert.couldNotSplit": "Could not split that PDF.",
   "alert.noClarify": "There is no batch waiting for clarification.",
+  "alert.noBlankReview": "There is no batch waiting for a blank-page review.",
   "alert.typeAnswer": "Type an answer so Gemini can finish this batch.",
   "alert.raw": "{raw}",
 
