@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { test } from "node:test";
 import { combinedMarkdown } from "../docs/js/download.js";
 import {
@@ -10,6 +12,9 @@ import {
   parseInlineRuns,
   parsePipeCells,
 } from "../docs/js/docx.js";
+
+const require = createRequire(import.meta.url);
+const JSZip = require("../docs/vendor/jszip.min.js");
 
 test("escapeXml encodes characters that would break OOXML", () => {
   assert.equal(escapeXml("A & B <C>"), "A &amp; B &lt;C&gt;");
@@ -198,4 +203,37 @@ test("textbook noun tables keep each header row", () => {
   assert.match(xml, />Common Nouns</);
   assert.match(xml, />Persons</);
   assert.match(xml, />Michelangelo</);
+});
+
+test("accessible pages-016-020.md produces three headered Word tables", () => {
+  const markdown = readFileSync(
+    new URL("../accessible/pages-016-020.md", import.meta.url),
+    "utf8"
+  );
+  const xml = markdownToDocumentXml(markdown);
+  assert.equal((xml.match(/<w:tbl>/g) || []).length, 3);
+  assert.equal((xml.match(/<w:tblHeader\/>/g) || []).length, 3);
+  assert.match(xml, />Category</);
+  assert.match(xml, />Proper Nouns</);
+  assert.match(xml, />Concrete Nouns</);
+  assert.match(xml, />Abstract Nouns</);
+  assert.doesNotMatch(xml, />\| Category \| Examples \|</);
+});
+
+test("JSZip packages table markup into a Word document", async () => {
+  const markdown = readFileSync(
+    new URL("../accessible/pages-016-020.md", import.meta.url),
+    "utf8"
+  );
+  const zip = new JSZip();
+  for (const [path, content] of Object.entries(buildDocxFiles(markdown))) {
+    zip.file(path, content);
+  }
+  const buffer = await zip.generateAsync({ type: "nodebuffer" });
+  const loaded = await JSZip.loadAsync(buffer);
+  const xml = await loaded.file("word/document.xml").async("string");
+  assert.ok(loaded.file("[Content_Types].xml"));
+  assert.ok(loaded.file("word/styles.xml"));
+  assert.equal((xml.match(/<w:tbl>/g) || []).length, 3);
+  assert.equal((xml.match(/<w:tblHeader\/>/g) || []).length, 3);
 });
