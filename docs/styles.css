@@ -355,9 +355,44 @@ progress {
   margin-bottom: 0;
 }
 
+.blank-actions {
+  margin-bottom: 0;
+}
+
+.blank-pages {
+  display: grid;
+  gap: 1rem;
+  margin: 0 0 1rem;
+}
+
+.blank-page {
+  margin: 0;
+  padding: 0.7rem;
+  border: 1px solid var(--rule);
+  background: #fffdf8;
+}
+
+.blank-page figcaption {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.blank-page canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  background: #fff;
+}
+
+.blank-page-fallback {
+  margin: 0.6rem 0 0;
+}
+
 .batch-row[data-status="running"],
 .batch-row[data-status="retrying"],
-.batch-row[data-status="clarify"] {
+.batch-row[data-status="clarify"],
+.batch-row[data-status="blank"] {
   background: var(--accent-soft);
 }
 

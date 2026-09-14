@@ -22,7 +22,8 @@ Open `http://127.0.0.1:8000`. Optional proxy URL on the page: `http://127.0.0.1:
 3. Drop a textbook PDF.
 4. Plan batches (5–8 pages).
 5. Adapt book.
-6. Download combined markdown or a zip.
+6. If Gemini returns no text, compare the original pages, then skip as blank or retry.
+7. Download combined markdown or a zip.
 
 ## CLI
 

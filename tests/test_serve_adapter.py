@@ -47,10 +47,13 @@ class ServeAdapterTests(unittest.TestCase):
         self.assertIn("js/app.js", body)
         self.assertIn("How to connect Gemini 3.8 Flash", body)
         self.assertIn("gemini-3.8-flash", body)
-        self.assertIn("A failed batch or a clarification question stops the run", body)
+        self.assertIn("A failed batch, a clarification question, or blank output stops the run", body)
         self.assertIn("Download Word document", body)
         self.assertIn("Wrap math in LaTeX (for Nemeth)", body)
         self.assertIn("clarify-section", body)
+        self.assertIn("pdf.min.js", body)
+        self.assertIn("blank-section", body)
+        self.assertIn("Skip as blank", body)
         self.assertIn("screen-reader-accessible", body)
 
     def test_app_module(self):
@@ -63,6 +66,7 @@ class ServeAdapterTests(unittest.TestCase):
         self.assertIn("runAdaptation", body)
         self.assertIn("applyTranscriptionError", body)
         self.assertIn("parseClarify", body)
+        self.assertIn("isBlankTranscription", body)
         self.assertIn("latexMath", body)
 
     def test_proxy_requires_api_key(self):

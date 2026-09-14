@@ -1,5 +1,6 @@
 /** Gemini generateContent client. Calls Google directly from the browser. */
 
+import { EMPTY_BATCH_MESSAGE } from "./blank-pages.js";
 import {
   buildInterpretationPrompt,
   buildStyleRules,
@@ -7,6 +8,8 @@ import {
   pageRangeLabel,
 } from "./prompt.js";
 import { stripModelFences } from "./validate.js";
+
+export { EMPTY_BATCH_MESSAGE };
 
 /** Google Gemini API model id. Do not use Cursor slugs such as gemini-3.8-flash-medium. */
 export const DEFAULT_MODEL = "gemini-3.8-flash";
@@ -278,7 +281,7 @@ export async function transcribeBatch({
 
     const text = stripModelFences(extractText(payload));
     if (!text) {
-      throw geminiError("Gemini returned empty text for this batch.");
+      throw geminiError(EMPTY_BATCH_MESSAGE);
     }
     return text;
   }

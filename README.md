@@ -15,7 +15,8 @@ This site calls the **Google Gemini API**, not Cursor’s model picker. The mode
 5. Paste the key into **Gemini API key**. Leave **Model** on Gemini 3.8 Flash.
 6. Drop a PDF, plan batches, then Adapt book.
 7. If Gemini cannot read a batch reliably, it asks a question in the clarification panel. Answer and continue that batch.
-8. Check **Wrap math in LaTeX (for Nemeth)** only when you want math wrapped as `\(...\)` or `$$...$$`. Leave it off for spoken plain-text math.
+8. If Gemini returns no text, the app pauses and shows the original pages. Skip them if they are blank, or retry if they have lesson content. Do not auto-skip empty output; that hides model failures.
+9. Check **Wrap math in LaTeX (for Nemeth)** only when you want math wrapped as `\(...\)` or `$$...$$`. Leave it off for spoken plain-text math.
 
 The key stays in the browser session. It is sent only to Google (`generativelanguage.googleapis.com`), or to an optional same-origin proxy. Vertex AI / Gemini Enterprise OAuth tokens are not supported here.
 
@@ -31,7 +32,7 @@ python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --latex-math
 
 The CLI cannot answer clarification questions. If a batch returns `CLARIFY:`, that batch fails and prints the question; use the web adapter to continue the conversation.
 
-The page vendors [pdf-lib](https://github.com/Hopding/pdf-lib) and [JSZip](https://github.com/Stuk/jszip) in `docs/vendor/`.
+The page vendors [pdf-lib](https://github.com/Hopding/pdf-lib), [pdf.js](https://github.com/mozilla/pdf.js), and [JSZip](https://github.com/Stuk/jszip) in `docs/vendor/`.
 
 ## Web app
 
@@ -53,7 +54,8 @@ https://grahamthetvi.github.io/Textbook_Braille_Adaptation/
 4. Optionally check **Wrap math in LaTeX (for Nemeth)**.
 5. Adapt book.
 6. If a clarification panel appears, answer the question and continue that batch.
-7. Download a Word document, combined markdown, or a zip of per-batch files.
+7. If a blank-output panel appears, compare the original pages, then skip or retry that batch.
+8. Download a Word document, combined markdown, or a zip of per-batch files.
 
 ### Enable GitHub Pages
 

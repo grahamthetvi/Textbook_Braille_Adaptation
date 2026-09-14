@@ -160,6 +160,22 @@
 
       <p id="form-alert" class="alert" hidden role="alert"></p>
 
+      <section id="blank-section" class="panel" aria-labelledby="blank-heading" hidden>
+        <h2 id="blank-heading">Blank output — check original pages</h2>
+        <p class="hint">
+          Gemini returned no text for this batch. That can mean the source pages
+          are blank, or that the model missed printed content. Compare the
+          original pages, then skip them if they are blank or retry if they have
+          lesson text. Remaining pending batches wait until you choose.
+        </p>
+        <p id="blank-meta" class="file-meta"></p>
+        <div id="blank-pages" class="blank-pages"></div>
+        <div class="actions blank-actions">
+          <button id="blank-skip-btn" type="button">Skip as blank</button>
+          <button id="blank-retry-btn" type="button">Retry this batch</button>
+        </div>
+      </section>
+
       <section id="clarify-section" class="panel" aria-labelledby="clarify-heading" hidden>
         <h2 id="clarify-heading">Clarification needed</h2>
         <p class="hint">
@@ -190,10 +206,11 @@
       <section id="error-section" class="panel" aria-labelledby="errors-heading" hidden>
         <h2 id="errors-heading">Failed batches</h2>
         <p class="hint">
-          A failed batch or a clarification question stops the run. Remaining
-          pending ranges are not sent.
+          A failed batch, a clarification question, or blank output stops the run.
+          Remaining pending ranges are not sent.
           Rate limits wait and retry the current batch without stopping.
-          Retry a failed row, answer a clarification, or Adapt book to resume pending batches.
+          Retry a failed row, answer a clarification, skip or retry blank output,
+          or Adapt book to resume pending batches.
           Completed batches stay downloadable.
         </p>
         <ul id="error-list" class="error-list"></ul>
@@ -211,6 +228,7 @@
     </main>
 
     <script src="vendor/pdf-lib.min.js"></script>
+    <script src="vendor/pdf.min.js"></script>
     <script src="vendor/jszip.min.js"></script>
     <script type="module" src="js/app.js"></script>
   </body>

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   DEFAULT_MODEL,
+  EMPTY_BATCH_MESSAGE,
   RATE_LIMIT_EXHAUSTED,
   RATE_LIMIT_RETRYING,
   RETRYABLE_MAX_RETRIES,
@@ -307,6 +308,27 @@ test("transcribeBatch returns a CLARIFY block for the UI to parse", async () => 
   });
   assert.equal(markdown, "CLARIFY:\nIs the figure a pie chart?");
   assert.equal(parseClarify(markdown), "Is the figure a pie chart?");
+});
+
+test("empty Gemini text throws the dedicated blank-batch message", async () => {
+  await assert.rejects(
+    () =>
+      transcribeBatch({
+        apiKey: "test-key",
+        startPage: 6,
+        endPage: 10,
+        pdfBytes: new Uint8Array([1, 2, 3, 4]),
+        fetchImpl: async () =>
+          jsonResponse(200, {
+            candidates: [{ content: { parts: [{ text: "   " }] } }],
+          }),
+      }),
+    (err) => {
+      assert.equal(err.message, EMPTY_BATCH_MESSAGE);
+      assert.equal(err.retryable, false);
+      return true;
+    }
+  );
 });
 
 
