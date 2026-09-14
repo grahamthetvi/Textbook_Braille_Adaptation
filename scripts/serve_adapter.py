@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serve the adapter web app from docs/ and optionally proxy Gemini."""
+"""Serve the adapter web app from docs/ and proxy Gemini, Claude, OpenAI, and Ollama."""
 
 from __future__ import annotations
 
@@ -16,10 +16,16 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO_ROOT / "docs"
 GEMINI_API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
+ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
+OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
+ANTHROPIC_VERSION = "2023-06-01"
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 MODEL_PATH_RE = re.compile(
     r"^/api/gemini/models/(?P<model>[^/]+):generateContent/?$"
 )
+OLLAMA_PATH_RE = re.compile(r"^/api/ollama(?P<rest>/api/(?:tags|chat))/?$")
 
 MIME_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -38,6 +44,42 @@ MIME_TYPES = {
     ".map": "application/json",
 }
 
+CORS_ALLOW_HEADERS = (
+    "Content-Type, x-goog-api-key, x-api-key, authorization, "
+    "anthropic-version, x-ollama-url"
+)
+
+
+def resolve_ollama_base(raw: str) -> str | None:
+    """Return a loopback Ollama origin, or None if the URL is not allowed."""
+    text = (raw or "").strip() or DEFAULT_OLLAMA_URL
+    parsed = urllib.parse.urlparse(text)
+    if parsed.scheme not in ("http", "https"):
+        return None
+    if parsed.username or parsed.password:
+        return None
+    host = (parsed.hostname or "").lower()
+    if host not in LOOPBACK_HOSTS:
+        return None
+    hostname = parsed.hostname
+    if host == "::1":
+        netloc = f"[{hostname}]"
+        if parsed.port:
+            netloc = f"[{hostname}]:{parsed.port}"
+    else:
+        netloc = hostname
+        if parsed.port:
+            netloc = f"{hostname}:{parsed.port}"
+    return f"{parsed.scheme}://{netloc}"
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(newurl, code, "Redirects are not followed", headers, fp)
+
+
+_NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirect)
+
 
 class AdapterHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -50,10 +92,7 @@ class AdapterHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header(
-            "Access-Control-Allow-Headers",
-            "Content-Type, x-goog-api-key, x-api-key",
-        )
+        self.send_header("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS)
         super().end_headers()
 
     def log_message(self, fmt, *args):
@@ -84,12 +123,24 @@ class AdapterHandler(SimpleHTTPRequestHandler):
     def _api_key(self) -> str:
         return (self.headers.get("x-goog-api-key") or self.headers.get("x-api-key") or "").strip()
 
+    def _authorization(self) -> str:
+        return (self.headers.get("Authorization") or "").strip()
+
     def do_OPTIONS(self):
         self.send_response(204)
         self.end_headers()
 
     def do_GET(self):
-        if self._request_path().startswith("/api/"):
+        path = self._request_path()
+        ollama = OLLAMA_PATH_RE.match(path)
+        if ollama:
+            rest = ollama.group("rest")
+            if rest != "/api/tags":
+                self._send_json(404, {"error": {"message": "Not found"}})
+                return
+            self._proxy_ollama("GET", rest, b"")
+            return
+        if path.startswith("/api/"):
             self._send_json(404, {"error": {"message": "Not found"}})
             return
         super().do_GET()
@@ -102,6 +153,16 @@ class AdapterHandler(SimpleHTTPRequestHandler):
             return
         if path.rstrip("/") == "/api/gemini":
             self._proxy_gemini_from_body(self._read_body())
+            return
+        if path.rstrip("/") == "/api/anthropic/v1/messages":
+            self._proxy_anthropic(self._read_body())
+            return
+        if path.rstrip("/") == "/api/openai/v1/responses":
+            self._proxy_openai(self._read_body())
+            return
+        ollama = OLLAMA_PATH_RE.match(path)
+        if ollama:
+            self._proxy_ollama("POST", ollama.group("rest"), self._read_body())
             return
         self._send_json(404, {"error": {"message": "Not found"}})
 
@@ -130,14 +191,98 @@ class AdapterHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {"error": {"message": "Invalid model name"}})
             return
         url = f"{GEMINI_API_ROOT}/models/{model}:generateContent?key={api_key}"
+        self._forward(
+            url,
+            body or b"{}",
+            headers={"Content-Type": "application/json"},
+            unreachable="Could not reach Gemini",
+        )
+
+    def _proxy_anthropic(self, body: bytes) -> None:
+        api_key = self._api_key()
+        if not api_key:
+            self._send_json(401, {"error": {"message": "Missing API key (x-api-key)"}})
+            return
+        version = (self.headers.get("anthropic-version") or ANTHROPIC_VERSION).strip()
+        self._forward(
+            ANTHROPIC_MESSAGES_URL,
+            body or b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": api_key,
+                "anthropic-version": version or ANTHROPIC_VERSION,
+            },
+            unreachable="Could not reach Anthropic",
+        )
+
+    def _proxy_openai(self, body: bytes) -> None:
+        authorization = self._authorization()
+        api_key = self._api_key()
+        if authorization.lower().startswith("bearer "):
+            token = authorization[7:].strip()
+        else:
+            token = api_key
+        if not token:
+            self._send_json(
+                401,
+                {"error": {"message": "Missing API key (Authorization or x-api-key)"}},
+            )
+            return
+        self._forward(
+            OPENAI_RESPONSES_URL,
+            body or b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
+            unreachable="Could not reach OpenAI",
+        )
+
+    def _proxy_ollama(self, method: str, rest: str, body: bytes) -> None:
+        raw_url = (self.headers.get("x-ollama-url") or "").strip()
+        base = resolve_ollama_base(raw_url)
+        if not base:
+            self._send_json(
+                400,
+                {
+                    "error": {
+                        "message": (
+                            "Ollama proxy only allows loopback URLs "
+                            "(127.0.0.1, localhost, ::1)"
+                        )
+                    }
+                },
+            )
+            return
+        url = f"{base}{rest}"
+        headers = {"Content-Type": "application/json"}
+        self._forward(
+            url,
+            body if method == "POST" else None,
+            headers=headers,
+            method=method,
+            unreachable="Could not reach Ollama",
+            opener=_NO_REDIRECT_OPENER,
+        )
+
+    def _forward(
+        self,
+        url: str,
+        body: bytes | None,
+        headers: dict[str, str],
+        unreachable: str,
+        method: str = "POST",
+        opener: urllib.request.OpenerDirector | None = None,
+    ) -> None:
         request = urllib.request.Request(
             url,
-            data=body or b"{}",
-            method="POST",
-            headers={"Content-Type": "application/json"},
+            data=body,
+            method=method,
+            headers=headers,
         )
+        open_url = opener.open if opener is not None else urllib.request.urlopen
         try:
-            with urllib.request.urlopen(request, timeout=300) as response:
+            with open_url(request, timeout=300) as response:
                 payload = response.read()
                 status = response.status
                 content_type = response.headers.get("Content-Type", "application/json")
@@ -150,7 +295,7 @@ class AdapterHandler(SimpleHTTPRequestHandler):
                 else "application/json"
             )
         except urllib.error.URLError as err:
-            self._send_json(502, {"error": {"message": f"Could not reach Gemini: {err.reason}"}})
+            self._send_json(502, {"error": {"message": f"{unreachable}: {err.reason}"}})
             return
         self._send_bytes(status, payload, content_type)
 
@@ -171,6 +316,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Serving {DOCS_DIR} at http://{args.host}:{args.port}", flush=True)
     print(f"Open http://{args.host}:{args.port}", flush=True)
     print("Gemini proxy: POST /api/gemini/models/<model>:generateContent", flush=True)
+    print("Claude proxy: POST /api/anthropic/v1/messages", flush=True)
+    print("OpenAI proxy: POST /api/openai/v1/responses", flush=True)
+    print("Ollama proxy: GET|POST /api/ollama/api/tags and /api/ollama/api/chat", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

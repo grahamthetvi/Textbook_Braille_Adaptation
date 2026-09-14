@@ -79,9 +79,10 @@ test("invalid API key error is described", () => {
   assert.match(message, /API key/i);
 });
 
-test("429 and 503 are retryable HTTP statuses", () => {
+test("429, 503, and 529 are retryable HTTP statuses", () => {
   assert.equal(isRetryableHttpStatus(429), true);
   assert.equal(isRetryableHttpStatus(503), true);
+  assert.equal(isRetryableHttpStatus(529), true);
   assert.equal(isRetryableHttpStatus(400), false);
   assert.equal(isRetryableHttpStatus(401), false);
   assert.equal(isRetryableHttpStatus(500), false);
@@ -283,6 +284,41 @@ test("default Gemini request uses plain-text math and screen-reader prompt", asy
   assert.match(user, /screen-reader-accessible/);
   assert.doesNotMatch(user, /Grade 2 braille translation/);
   assert.doesNotMatch(user, /Retry after empty output/);
+});
+
+test("transcribeBatch sends the selected Gemini thinking level", async () => {
+  let body;
+  await transcribeBatch({
+    apiKey: "test-key",
+    model: "gemini-3.8-flash",
+    effort: "high",
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return jsonResponse(200, {
+        candidates: [{ content: { parts: [{ text: "Lesson title" }] } }],
+      });
+    },
+  });
+  assert.deepEqual(body.generationConfig, { thinkingConfig: { thinkingLevel: "high" } });
+  const low = await transcribeBatch({
+    apiKey: "test-key",
+    model: "gemini-3.1-pro-preview",
+    effort: "low",
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    fetchImpl: async (_url, options) => {
+      const parsed = JSON.parse(options.body);
+      assert.deepEqual(parsed.generationConfig, { thinkingConfig: { thinkingLevel: "low" } });
+      return jsonResponse(200, {
+        candidates: [{ content: { parts: [{ text: "Lesson title" }] } }],
+      });
+    },
+  });
+  assert.equal(low, "Lesson title");
 });
 
 test("Spanish locale adds a website-language instruction to the Gemini request", async () => {

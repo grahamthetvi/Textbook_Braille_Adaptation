@@ -5,7 +5,18 @@
 
 import { splitPdfBytes, inspectPdf, extractPagePdfs } from "./pdf-split.js";
 import { renderPageCanvas } from "./pdf-preview.js";
-import { transcribeBatch, MODEL_OPTIONS, DEFAULT_MODEL } from "./gemini.js";
+import { transcribeBatch } from "./transcribe.js";
+import {
+  CUSTOM_MODEL_VALUE,
+  DEFAULT_MODEL,
+  DEFAULT_OLLAMA_URL,
+  MODEL_GROUPS,
+  OLLAMA_SENTINEL,
+  effortAfterProviderChange,
+  effortSpec,
+  providerForModel,
+} from "./models.js";
+import { listOllamaModels } from "./ollama.js";
 import { parseClarifyResponse } from "./prompt.js";
 import { validateMarkdown } from "./validate.js";
 import { downloadCombined, downloadDocx, downloadZip } from "./download.js";
@@ -28,8 +39,12 @@ import {
   skippedBlankMarkdown,
 } from "./blank-pages.js";
 
-const SESSION_KEY = "textbook-adapter-api-key";
-const CUSTOM_MODEL_VALUE = "__custom__";
+const LEGACY_SESSION_KEY = "textbook-adapter-api-key";
+const SESSION_KEY_PREFIX = "textbook-adapter-api-key-";
+const SESSION_OLLAMA_URL = "textbook-adapter-ollama-url";
+const SESSION_OLLAMA_MODEL = "textbook-adapter-ollama-model";
+const SESSION_OLLAMA_CUSTOM = "textbook-adapter-ollama-custom";
+const OLLAMA_CUSTOM_VALUE = "__custom_ollama__";
 
 const BATCH_STATUS_KEYS = {
   pending: "batch.pending",
@@ -57,17 +72,34 @@ const state = {
   blankPreviewToken: 0,
   uiStatus: { key: "status.loadPdf", vars: {} },
   uiAlert: { key: "", vars: {} },
+  provider: "gemini",
 };
 
 function cacheElements() {
   els.form = document.getElementById("adapter-form");
+  els.apiKeyField = document.getElementById("api-key-field");
+  els.apiKeyLabel = document.getElementById("api-key-label");
   els.apiKey = document.getElementById("api-key");
+  els.apiKeyHint = document.getElementById("api-key-hint");
+  els.rememberKeyField = document.getElementById("remember-key-field");
   els.rememberKey = document.getElementById("remember-key");
+  els.setupSummary = document.getElementById("setup-summary");
+  els.setupSteps = document.getElementById("setup-steps");
   els.model = document.getElementById("model");
+  els.modelHint = document.getElementById("model-hint");
+  els.effort = document.getElementById("effort");
+  els.effortHint = document.getElementById("effort-hint");
   els.customModelWrap = document.getElementById("custom-model-wrap");
   els.customModel = document.getElementById("custom-model");
   els.batchSize = document.getElementById("batch-size");
+  els.advancedProxy = document.getElementById("advanced-proxy");
   els.proxyUrl = document.getElementById("proxy-url");
+  els.ollamaFields = document.getElementById("ollama-fields");
+  els.ollamaUrl = document.getElementById("ollama-url");
+  els.ollamaModel = document.getElementById("ollama-model");
+  els.ollamaRefresh = document.getElementById("ollama-refresh");
+  els.ollamaCustomWrap = document.getElementById("ollama-custom-wrap");
+  els.ollamaCustom = document.getElementById("ollama-custom");
   els.dropZone = document.getElementById("drop-zone");
   els.pdfFile = document.getElementById("pdf-file");
   els.fileMeta = document.getElementById("file-meta");
@@ -107,15 +139,41 @@ function getPreferredBatchSize() {
   return Math.max(5, Math.min(8, size));
 }
 
+function getCatalogModel() {
+  return (els.model.value || "").trim();
+}
+
 function getModel() {
   if (els.model.value === CUSTOM_MODEL_VALUE) {
     return els.customModel.value.trim();
   }
-  return (els.model.value || "").trim();
+  return getCatalogModel();
+}
+
+function getProvider() {
+  return providerForModel(getCatalogModel() === CUSTOM_MODEL_VALUE ? CUSTOM_MODEL_VALUE : getCatalogModel());
+}
+
+function getEffort() {
+  return (els.effort.value || "").trim();
 }
 
 function getApiKey() {
   return els.apiKey.value.trim();
+}
+
+function getOllamaModel() {
+  if (!els.ollamaModel) {
+    return (els.ollamaCustom?.value || "").trim();
+  }
+  if (els.ollamaModel.value === OLLAMA_CUSTOM_VALUE || !els.ollamaModel.value) {
+    return (els.ollamaCustom?.value || "").trim();
+  }
+  return els.ollamaModel.value.trim();
+}
+
+function sessionKeyFor(provider) {
+  return `${SESSION_KEY_PREFIX}${provider}`;
 }
 
 function setStatus(key, vars = {}) {
@@ -158,11 +216,16 @@ function completedBatches() {
 function populateModelSelect() {
   const previous = els.model.value;
   els.model.replaceChildren();
-  for (const option of MODEL_OPTIONS) {
-    const node = document.createElement("option");
-    node.value = option.value;
-    node.textContent = option.label;
-    els.model.append(node);
+  for (const group of MODEL_GROUPS) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = t(group.labelKey);
+    for (const option of group.models) {
+      const node = document.createElement("option");
+      node.value = option.value;
+      node.textContent = t(option.labelKey);
+      optgroup.append(node);
+    }
+    els.model.append(optgroup);
   }
   const custom = document.createElement("option");
   custom.value = CUSTOM_MODEL_VALUE;
@@ -174,30 +237,185 @@ function populateModelSelect() {
   } else {
     els.model.value = DEFAULT_MODEL;
   }
-  syncCustomModelField();
+}
+
+function populateEffortSelect(provider, { keepCurrent = false } = {}) {
+  const spec = effortSpec(provider);
+  const current = els.effort.value;
+  els.effort.replaceChildren();
+  for (const value of spec.effortValues) {
+    const option = document.createElement("option");
+    option.value = value;
+    const label = t(`effort.${value}`);
+    option.textContent =
+      value === spec.recommendedEffort ? t("effort.recommended", { label }) : label;
+    els.effort.append(option);
+  }
+  const next = keepCurrent
+    ? effortAfterProviderChange(provider, current)
+    : spec.recommendedEffort;
+  els.effort.value = next;
 }
 
 function syncCustomModelField() {
   const showCustom = els.model.value === CUSTOM_MODEL_VALUE;
   els.customModelWrap.hidden = !showCustom;
-  els.customModel.disabled = !showCustom;
+  els.customModel.disabled = !showCustom || state.running;
 }
 
-function persistApiKey() {
-  if (els.rememberKey.checked && getApiKey()) {
-    sessionStorage.setItem(SESSION_KEY, getApiKey());
-    return;
-  }
-  sessionStorage.removeItem(SESSION_KEY);
+function syncOllamaCustomField() {
+  const showCustom =
+    !els.ollamaModel.options.length ||
+    els.ollamaModel.value === OLLAMA_CUSTOM_VALUE ||
+    !els.ollamaModel.value;
+  els.ollamaCustomWrap.hidden = !showCustom;
 }
 
-function restoreApiKey() {
-  const saved = sessionStorage.getItem(SESSION_KEY);
-  if (!saved) {
+function applyProviderCopy(provider) {
+  const prefix = `form.${provider}`;
+  if (els.apiKeyLabel) {
+    els.apiKeyLabel.setAttribute("data-i18n", `${prefix}.apiKey`);
+  }
+  if (els.apiKeyHint) {
+    els.apiKeyHint.setAttribute("data-i18n-html", `${prefix}.apiKeyHint`);
+  }
+  if (els.setupSummary) {
+    els.setupSummary.setAttribute("data-i18n", `${prefix}.setupSummary`);
+  }
+  if (els.modelHint) {
+    els.modelHint.setAttribute("data-i18n", `${prefix}.modelHint`);
+  }
+  if (els.effortHint) {
+    els.effortHint.setAttribute("data-i18n", `${prefix}.effortHint`);
+  }
+  if (els.setupSteps) {
+    for (const step of els.setupSteps.querySelectorAll("[data-setup-step]")) {
+      const number = step.getAttribute("data-setup-step");
+      step.setAttribute("data-i18n-html", `${prefix}.setupStep${number}`);
+    }
+    applyTranslations(els.setupSteps);
+  }
+  applyTranslations(els.form);
+}
+
+function syncProviderUi({ keepEffort = false } = {}) {
+  const provider = getProvider();
+  const providerChanged = provider !== state.provider;
+  if (providerChanged) {
+    persistApiKey(state.provider);
+    state.provider = provider;
+    restoreApiKey(provider);
+  }
+  populateEffortSelect(provider, { keepCurrent: keepEffort || !providerChanged });
+  const isOllama = provider === "ollama";
+  els.apiKeyField.hidden = isOllama;
+  els.rememberKeyField.hidden = isOllama;
+  els.ollamaFields.hidden = !isOllama;
+  if (els.advancedProxy) {
+    els.advancedProxy.hidden = provider !== "gemini";
+  }
+  syncCustomModelField();
+  applyProviderCopy(provider);
+}
+
+function persistApiKey(provider = state.provider) {
+  if (provider === "ollama") {
+    try {
+      sessionStorage.setItem(SESSION_OLLAMA_URL, els.ollamaUrl.value.trim() || DEFAULT_OLLAMA_URL);
+      sessionStorage.setItem(SESSION_OLLAMA_MODEL, els.ollamaModel.value || "");
+      sessionStorage.setItem(SESSION_OLLAMA_CUSTOM, els.ollamaCustom.value.trim());
+    } catch {
+      // Ignore missing storage.
+    }
     return;
   }
-  els.apiKey.value = saved;
-  els.rememberKey.checked = true;
+  try {
+    if (els.rememberKey.checked && getApiKey()) {
+      sessionStorage.setItem(sessionKeyFor(provider), getApiKey());
+      return;
+    }
+    sessionStorage.removeItem(sessionKeyFor(provider));
+  } catch {
+    // Ignore missing storage.
+  }
+}
+
+function restoreApiKey(provider = state.provider) {
+  if (provider === "ollama") {
+    try {
+      const url = sessionStorage.getItem(SESSION_OLLAMA_URL);
+      if (url) {
+        els.ollamaUrl.value = url;
+      }
+      const custom = sessionStorage.getItem(SESSION_OLLAMA_CUSTOM);
+      if (custom) {
+        els.ollamaCustom.value = custom;
+      }
+    } catch {
+      // Ignore missing storage.
+    }
+    return;
+  }
+  try {
+    const saved = sessionStorage.getItem(sessionKeyFor(provider));
+    if (!saved) {
+      els.apiKey.value = "";
+      return;
+    }
+    els.apiKey.value = saved;
+    els.rememberKey.checked = true;
+  } catch {
+    // Ignore missing storage.
+  }
+}
+
+function migrateLegacyApiKey() {
+  try {
+    const legacy = sessionStorage.getItem(LEGACY_SESSION_KEY);
+    if (legacy && !sessionStorage.getItem(sessionKeyFor("gemini"))) {
+      sessionStorage.setItem(sessionKeyFor("gemini"), legacy);
+    }
+    sessionStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    // Ignore missing storage.
+  }
+}
+
+function populateOllamaSelect(tags, selected) {
+  const previous = selected || els.ollamaModel.value || "";
+  els.ollamaModel.replaceChildren();
+  for (const name of tags) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    els.ollamaModel.append(option);
+  }
+  const custom = document.createElement("option");
+  custom.value = OLLAMA_CUSTOM_VALUE;
+  custom.textContent = t("form.ollama.customTag");
+  els.ollamaModel.append(custom);
+  if (previous && [...els.ollamaModel.options].some((option) => option.value === previous)) {
+    els.ollamaModel.value = previous;
+  } else if (previous && previous !== OLLAMA_CUSTOM_VALUE) {
+    els.ollamaModel.value = OLLAMA_CUSTOM_VALUE;
+    els.ollamaCustom.value = previous;
+  } else {
+    els.ollamaModel.value = tags[0] || OLLAMA_CUSTOM_VALUE;
+  }
+  syncOllamaCustomField();
+}
+
+async function refreshOllamaModels() {
+  persistApiKey("ollama");
+  try {
+    const tags = await listOllamaModels({ ollamaUrl: els.ollamaUrl.value.trim() || DEFAULT_OLLAMA_URL });
+    const saved = sessionStorage.getItem(SESSION_OLLAMA_MODEL) || els.ollamaModel.value;
+    populateOllamaSelect(tags, saved);
+    setAlert("");
+  } catch (err) {
+    populateOllamaSelect([], els.ollamaCustom.value.trim());
+    setAlert("alert.raw", { raw: err?.message || t("ollama.refreshFailed") });
+  }
 }
 
 function setRunning(running) {
@@ -207,8 +425,21 @@ function setRunning(running) {
   els.pdfFile.disabled = running;
   els.batchSize.disabled = running;
   els.model.disabled = running;
+  els.effort.disabled = running;
   els.customModel.disabled = running || els.model.value !== CUSTOM_MODEL_VALUE;
   els.latexMath.disabled = running;
+  if (els.ollamaUrl) {
+    els.ollamaUrl.disabled = running;
+  }
+  if (els.ollamaModel) {
+    els.ollamaModel.disabled = running;
+  }
+  if (els.ollamaRefresh) {
+    els.ollamaRefresh.disabled = running;
+  }
+  if (els.ollamaCustom) {
+    els.ollamaCustom.disabled = running;
+  }
   els.cancelBtn.disabled = !running;
   els.clarifyContinueBtn.disabled = running;
   els.clarifyRetryBtn.disabled = running;
@@ -503,6 +734,7 @@ function render() {
 function refreshUi() {
   applyTranslations();
   populateModelSelect();
+  syncProviderUi({ keepEffort: true });
   syncThemeToggle();
   refreshStatus();
   refreshAlert();
@@ -634,15 +866,23 @@ async function runAdaptation({ retryOnly = null } = {}) {
   }
 
   const apiKey = getApiKey();
-  const model = getModel();
-  if (!apiKey) {
+  const provider = getProvider();
+  const catalogModel = getCatalogModel();
+  const model = provider === "ollama" ? getOllamaModel() : getModel();
+  const effort = getEffort();
+  if (provider !== "ollama" && !apiKey) {
     setAlert("alert.needKey");
     els.apiKey.focus();
     return;
   }
-  if (!model) {
+  if (provider === "ollama" && !model) {
+    setAlert("alert.needOllamaModel");
+    (els.ollamaCustomWrap.hidden ? els.ollamaModel : els.ollamaCustom).focus();
+    return;
+  }
+  if (provider !== "ollama" && !model) {
     setAlert("alert.needModel");
-    (els.model.value === CUSTOM_MODEL_VALUE ? els.customModel : els.model).focus();
+    (catalogModel === CUSTOM_MODEL_VALUE ? els.customModel : els.model).focus();
     return;
   }
   if (!state.sourceBytes) {
@@ -651,6 +891,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
   }
 
   persistApiKey();
+  persistApiKey("ollama");
   setAlert("");
   state.abortController = new AbortController();
   const latexMath = Boolean(els.latexMath.checked);
@@ -703,7 +944,11 @@ async function runAdaptation({ retryOnly = null } = {}) {
         try {
           const markdown = await transcribeBatch({
             apiKey,
-            model,
+            model: provider === "ollama" ? OLLAMA_SENTINEL : model,
+            ollamaModel: provider === "ollama" ? model : "",
+            ollamaUrl: els.ollamaUrl.value.trim() || DEFAULT_OLLAMA_URL,
+            provider,
+            effort,
             startPage: batch.startPage,
             endPage: batch.endPage,
             pdfBytes: batch.bytes,
@@ -937,9 +1182,20 @@ function bindEvents() {
   els.clarifyRetryBtn.addEventListener("click", retryClarifyFromScratch);
   els.blankSkipBtn.addEventListener("click", skipBlankBatch);
   els.blankRetryBtn.addEventListener("click", retryBlankBatch);
-  els.model.addEventListener("change", syncCustomModelField);
+  els.model.addEventListener("change", () => {
+    syncProviderUi({ keepEffort: true });
+  });
   els.apiKey.addEventListener("input", persistApiKey);
   els.rememberKey.addEventListener("change", persistApiKey);
+  els.ollamaRefresh.addEventListener("click", () => {
+    refreshOllamaModels();
+  });
+  els.ollamaModel.addEventListener("change", () => {
+    syncOllamaCustomField();
+    persistApiKey("ollama");
+  });
+  els.ollamaUrl.addEventListener("change", () => persistApiKey("ollama"));
+  els.ollamaCustom.addEventListener("input", () => persistApiKey("ollama"));
   els.localeSelect.addEventListener("change", () => {
     setLocale(els.localeSelect.value);
   });
@@ -1009,7 +1265,12 @@ function bindEvents() {
 cacheElements();
 onLocaleChange(refreshUi);
 initTheme();
-restoreApiKey();
+migrateLegacyApiKey();
+if (els.ollamaUrl && !els.ollamaUrl.value) {
+  els.ollamaUrl.value = DEFAULT_OLLAMA_URL;
+}
+populateOllamaSelect([]);
 bindEvents();
 setLocale(detectLocale());
 refreshUi();
+restoreApiKey();

@@ -49,7 +49,7 @@ test("{placeholder} interpolation", () => {
   );
   assert.equal(
     t("status.plannedMany", { batches: 3, count: 20 }),
-    "Planned 3 batches from 20 pages. Gemini is not called until you adapt."
+    "Planned 3 batches from 20 pages. The model is not called until you adapt."
   );
   setLocale("es");
   assert.equal(
@@ -93,4 +93,9 @@ test("Spanish and Arabic catalogs cover every English key", () => {
   const englishKeys = Object.keys(catalogs.en).sort();
   assert.deepEqual(Object.keys(catalogs.es).sort(), englishKeys);
   assert.deepEqual(Object.keys(catalogs.ar).sort(), englishKeys);
+  assert.equal(englishKeys.includes("gemini.model25Flash"), false);
+  assert.equal(englishKeys.includes("gemini.model20Flash"), false);
+  assert.equal(englishKeys.includes("form.geminiAccess"), false);
+  assert.equal(englishKeys.includes("form.modelAccess"), true);
+  assert.equal(englishKeys.includes("form.effort"), true);
 });
