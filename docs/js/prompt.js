@@ -26,6 +26,7 @@ Unreadable word: write (unclear). Do not guess a word that would change the less
 Comma-group multi-digit numbers when it aids comprehension, for example 1,000 students. Write dates and phone numbers with hyphen separators, for example March-4-2026 or 555-123-4567.
 Write "and" not an ampersand unless the ampersand appears in the source.
 Skip decorative word clouds unless specific words are required for the lesson. Transcribe the book title, edition, and copyright block on a cover when printed as normal text. When a page has no readable lesson content, write: Transcriber note: A decorative word cloud fills the cover; no lesson text is present.
+Do not return an empty reply when printed lesson text is visible. If you cannot transcribe, ask a CLARIFY question instead of silence.
 Keep the full URL on one line when the book prints it that way. You may introduce it plainly, for example Permissions website: followed by the URL.
 Output markdown or plain text only when completing a batch. No preamble, no code fences.
 `;
@@ -124,19 +125,31 @@ export function buildStyleRules(latexMath = false, options = {}) {
   return `${STYLE_RULES}\n${language}\n${LATEX_MATH_INSTRUCTION}\n`;
 }
 
+/** Extra user-turn copy after a reviewer confirmed the scan has printed text. */
+export function formatEmptyRetryInstruction(options = {}) {
+  const lang = resolveOutputLanguage(options.locale);
+  return `Retry after empty output
+A reviewer looked at the original scans for this batch and confirmed they contain printed lesson text. Your previous reply was empty. That was a miss, not a blank page.
+Transcribe every printed lesson on these pages now. Do not return empty output. Do not skip the batch. Read every page in the attached PDF. If a word is unreadable, write ${lang.unclearToken}. If you cannot reliably make the content accessible, return a ${lang.clarifyMarker} block instead of silence.
+Empty output is only for pages with no printed marks. These pages have printed text.`;
+}
+
 export function buildInterpretationPrompt(pageRange, options = {}) {
   const latexMath = Boolean(options.latexMath);
   const mathLine = latexMath ? LATEX_MATH_INSTRUCTION : PLAIN_MATH_INSTRUCTION;
   const lang = resolveOutputLanguage(options.locale);
   const language = languageInstruction(options.locale);
   const languageBlock = language ? `\n${language}\n` : "\n";
+  const emptyRetry = Boolean(options.emptyRetry)
+    ? `\n${formatEmptyRetryInstruction(options)}\n`
+    : "";
   return `Produce screen-reader-accessible text from these scanned textbook pages. Do not output braille, contractions, or braille ASCII.
 
 Follow the system instruction. Transcribe faithfully. If you cannot reliably make the content accessible, end with a ${lang.clarifyMarker} block. Prefer a ${lang.clarifyMarker}-only reply. Nested lists are allowed. Number or letter questions when they sit under a numbered item. Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. Avoid square brackets, braces, asterisk, and number-sign unless they appear in the source. Do not use markdown hash headings. Use ${lang.unclearToken} for unreadable words. Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
 ${languageBlock}${mathLine}
 
 Output markdown or plain text only when completing the batch. No preamble, no code fences.
-Source pages in this batch: ${pageRange}.`;
+Source pages in this batch: ${pageRange}.${emptyRetry}`;
 }
 
 /** Split a model reply into an optional draft and a trailing clarify question. */

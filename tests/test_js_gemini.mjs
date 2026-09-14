@@ -282,6 +282,7 @@ test("default Gemini request uses plain-text math and screen-reader prompt", asy
   assert.equal(system.includes("Math LaTeX mode is on"), false);
   assert.match(user, /screen-reader-accessible/);
   assert.doesNotMatch(user, /Grade 2 braille translation/);
+  assert.doesNotMatch(user, /Retry after empty output/);
 });
 
 test("Spanish locale adds a website-language instruction to the Gemini request", async () => {
@@ -375,6 +376,40 @@ test("multiple clarify turns keep the same PDF and later Q&A", () => {
   assert.equal(contents[3].role, "model");
   assert.equal(contents[3].parts[0].text, "CLARIFY:\nIs the printed total 24 or 42?");
   assert.match(contents[4].parts[0].text, /^24\./);
+});
+
+test("empty-output retry adds the confirmed-text instruction to the Gemini request", async () => {
+  const firstTry = buildTranscribeContents({
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+  });
+  assert.doesNotMatch(firstTry[0].parts[1].text, /Retry after empty output/);
+  const retry = buildTranscribeContents({
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    emptyRetry: true,
+  });
+  assert.match(retry[0].parts[1].text, /Retry after empty output/);
+  assert.match(retry[0].parts[1].text, /reviewer looked at the original scans/);
+
+  let body;
+  await transcribeBatch({
+    apiKey: "test-key",
+    startPage: 6,
+    endPage: 10,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    emptyRetry: true,
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return jsonResponse(200, {
+        candidates: [{ content: { parts: [{ text: "Lesson title" }] } }],
+      });
+    },
+  });
+  assert.match(body.contents[0].parts[1].text, /Retry after empty output/);
+  assert.match(body.system_instruction.parts[0].text, /empty reply when printed lesson text is visible/);
 });
 
 test("transcribeBatch returns a CLARIFY block for the UI to parse", async () => {

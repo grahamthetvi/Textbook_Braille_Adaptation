@@ -61,9 +61,9 @@ export const en = {
 
   "blank.heading": "Blank output — check original pages",
   "blank.hint":
-    "Gemini returned no text for this batch. That can mean the source pages are blank, or that the model missed printed content. Compare the original pages, then skip them if they are blank or retry if they have lesson text. Remaining pending batches wait until you choose.",
+    "Gemini returned no text for this batch. That can mean the source pages are blank, or that the model missed printed content. Compare the original pages, then skip them if they are blank or retry if they have lesson text. Retry tells Gemini a reviewer confirmed printed text, so it must transcribe these pages instead of returning empty. Remaining pending batches wait until you choose.",
   "blank.skip": "Skip as blank",
-  "blank.retry": "Retry this batch",
+  "blank.retry": "Retry — pages have text",
   "blank.pages": "pages {range}",
   "blank.sourcePage": "Source page {page}",
   "blank.downloadPage": "Download source page {page}",
@@ -88,11 +88,13 @@ export const en = {
   "status.splitting": "Splitting the PDF into batches…",
   "status.noPending": "No pending batches. Retry a failed row, or download what already completed.",
   "status.batchProgress": "Batch {index} of {total}: pages {range}",
+  "status.batchProgressEmptyRetry":
+    "Batch {index} of {total}: pages {range}. Retrying after a reviewer confirmed printed text.",
   "status.batchRetry": "Batch {index} of {total}. {message}",
   "status.pausedClarify":
     "Paused on pages {range}. Gemini needs a clarification before that batch can finish.",
   "status.pausedBlank":
-    "Paused on pages {range}. Gemini returned no text. Compare the original pages, then skip if they are blank or retry if they have content.",
+    "Paused on pages {range}. Gemini returned no text. Compare the original pages, then skip if they are blank or retry if they have content. Retry tells Gemini these pages have printed text.",
   "status.skippedBlankContinue":
     "Skipped pages {range} as blank. Continuing with remaining batches.",
   "status.skippedBlankFinished":

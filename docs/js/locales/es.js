@@ -61,9 +61,9 @@ export const es = {
 
   "blank.heading": "Salida en blanco — revisa las páginas originales",
   "blank.hint":
-    "Gemini no devolvió texto para este lote. Puede que las páginas de origen estén en blanco, o que el modelo no haya visto el contenido impreso. Compara las páginas originales y luego omítelas si están en blanco o reintenta si tienen texto de la lección. Los lotes pendientes restantes esperan hasta que elijas.",
+    "Gemini no devolvió texto para este lote. Puede que las páginas de origen estén en blanco, o que el modelo no haya visto el contenido impreso. Compara las páginas originales y luego omítelas si están en blanco o reintenta si tienen texto de la lección. Reintentar le dice a Gemini que un revisor confirmó texto impreso, así que debe transcribir estas páginas en lugar de devolver un resultado vacío. Los lotes pendientes restantes esperan hasta que elijas.",
   "blank.skip": "Omitir por estar en blanco",
-  "blank.retry": "Reintentar este lote",
+  "blank.retry": "Reintentar: las páginas tienen texto",
   "blank.pages": "páginas {range}",
   "blank.sourcePage": "Página de origen {page}",
   "blank.downloadPage": "Descargar página de origen {page}",
@@ -89,11 +89,13 @@ export const es = {
   "status.noPending":
     "No hay lotes pendientes. Reintenta una fila fallida o descarga lo que ya se completó.",
   "status.batchProgress": "Lote {index} de {total}: páginas {range}",
+  "status.batchProgressEmptyRetry":
+    "Lote {index} de {total}: páginas {range}. Reintentando después de que un revisor confirmó texto impreso.",
   "status.batchRetry": "Lote {index} de {total}. {message}",
   "status.pausedClarify":
     "En pausa en las páginas {range}. Gemini necesita una aclaración antes de poder terminar ese lote.",
   "status.pausedBlank":
-    "En pausa en las páginas {range}. Gemini no devolvió texto. Compara las páginas originales y luego omítelas si están en blanco o reintenta si tienen contenido.",
+    "En pausa en las páginas {range}. Gemini no devolvió texto. Compara las páginas originales y luego omítelas si están en blanco o reintenta si tienen contenido. Reintentar le dice a Gemini que estas páginas tienen texto impreso.",
   "status.skippedBlankContinue":
     "Se omitieron las páginas {range} por estar en blanco. Continuando con los lotes restantes.",
   "status.skippedBlankFinished":

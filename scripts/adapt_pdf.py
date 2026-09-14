@@ -49,6 +49,7 @@ Unreadable word: write (unclear). Do not guess a word that would change the less
 Comma-group multi-digit numbers when it aids comprehension, for example 1,000 students. Write dates and phone numbers with hyphen separators, for example March-4-2026 or 555-123-4567.
 Write "and" not an ampersand unless the ampersand appears in the source.
 Skip decorative word clouds unless specific words are required for the lesson. Transcribe the book title, edition, and copyright block on a cover when printed as normal text. When a page has no readable lesson content, write: Transcriber note: A decorative word cloud fills the cover; no lesson text is present.
+Do not return an empty reply when printed lesson text is visible. If you cannot transcribe, ask a CLARIFY question instead of silence.
 Keep the full URL on one line when the book prints it that way. You may introduce it plainly, for example Permissions website: followed by the URL.
 Output markdown or plain text only when completing a batch. No preamble, no code fences.
 """
