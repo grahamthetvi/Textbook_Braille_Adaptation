@@ -51,25 +51,26 @@
         </button>
       </div>
       <p id="locale-hint" class="hint locale-hint" data-i18n="header.languageHint">
-        Gemini asks clarification questions in this language and marks unreadable
-        words in this language. Printed lesson text stays in the language of the book.
+        Clarification questions and unreadable-word marks use this language.
+        Printed lesson text stays in the language of the book.
       </p>
       <p class="eyebrow" data-i18n="header.eyebrow">Accessible textbook prep</p>
       <h1 data-i18n="header.title">Textbook Adapter</h1>
       <p class="lede" data-i18n="header.lede">
-        Drop a scanned textbook PDF, paste a Gemini API key, and download
-        screen-reader-accessible markdown. The key stays in this browser session and
-        is sent only to Google Gemini, or to an optional proxy you set.
+        Drop a scanned textbook PDF, choose a model, and download
+        screen-reader-accessible markdown. Cloud keys stay in this browser session.
+        Gemini can run from this page; Claude, OpenAI, and Ollama need the local
+        adapter server.
       </p>
     </header>
 
     <main id="main">
       <form id="adapter-form" novalidate>
         <fieldset class="panel">
-          <legend data-i18n="form.geminiAccess">Gemini access</legend>
+          <legend data-i18n="form.modelAccess">Model access</legend>
 
-          <div class="field">
-            <label for="api-key" data-i18n="form.apiKey">Gemini API key</label>
+          <div class="field" id="api-key-field">
+            <label id="api-key-label" for="api-key" data-i18n="form.gemini.apiKey">Gemini API key</label>
             <input
               id="api-key"
               name="api-key"
@@ -78,7 +79,7 @@
               spellcheck="false"
               aria-describedby="api-key-hint"
             />
-            <p id="api-key-hint" class="hint" data-i18n-html="form.apiKeyHint">
+            <p id="api-key-hint" class="hint" data-i18n-html="form.gemini.apiKeyHint">
               Create a Gemini API key in
               <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer">Google AI Studio</a>.
               Required to adapt. Not written to disk. Session storage is used only if
@@ -86,27 +87,29 @@
             </p>
           </div>
 
-          <details class="setup-steps">
-            <summary data-i18n="form.setupSummary">How to connect Gemini 3.8 Flash</summary>
+          <details class="setup-steps" id="setup-steps">
+            <summary id="setup-summary" data-i18n="form.gemini.setupSummary">How to connect Gemini 3.8 Flash</summary>
             <ol>
-              <li data-i18n-html="form.setupStep1">
+              <li data-setup-step="1" data-i18n-html="form.gemini.setupStep1">
                 Open
                 <a href="https://aistudio.google.com/apikey" rel="noopener noreferrer">Google AI Studio API keys</a>
                 and sign in with the Google account that should be billed.
               </li>
-              <li data-i18n-html="form.setupStep2">
+              <li data-setup-step="2" data-i18n-html="form.gemini.setupStep2">
                 Create an API key in a Google Cloud project. If prompted, enable the
                 <strong>Gemini API</strong> (Generative Language API) for that project.
               </li>
-              <li data-i18n-html="form.setupStep3">
+              <li data-setup-step="3" data-i18n-html="form.gemini.setupStep3">
                 Paste the key in the field above. Leave <strong>Model</strong> on
                 Gemini 3.8 Flash. The Google API id is <code>gemini-3.8-flash</code>.
+                Leave <strong>Effort</strong> on medium (recommended).
               </li>
-              <li data-i18n-html="form.setupStep4">
+              <li data-setup-step="4" data-i18n-html="form.gemini.setupStep4">
                 Do not type Cursor names such as <code>gemini-3.8-flash-medium</code>
-                into Custom model. Those are not valid Google API ids.
+                into Custom model. Those are not valid Google API ids; pick the model
+                and effort separately.
               </li>
-              <li data-i18n-html="form.setupStep5">
+              <li data-setup-step="5" data-i18n-html="form.gemini.setupStep5">
                 If this page cannot reach Google from the browser, run
                 <code>python3 scripts/serve_adapter.py</code> and set the proxy to
                 <code>http://127.0.0.1:8000/api/gemini</code>.
@@ -114,7 +117,7 @@
             </ol>
           </details>
 
-          <div class="field checkbox-field">
+          <div class="field checkbox-field" id="remember-key-field">
             <input id="remember-key" name="remember-key" type="checkbox" />
             <label for="remember-key" data-i18n="form.rememberKey">Remember key this session</label>
           </div>
@@ -123,8 +126,15 @@
             <div class="field">
               <label for="model" data-i18n="form.model">Model</label>
               <select id="model" name="model" aria-describedby="model-hint"></select>
-              <p id="model-hint" class="hint" data-i18n="form.modelHint">
-                Use Gemini 3.8 Flash unless an older key cannot call that model.
+              <p id="model-hint" class="hint" data-i18n="form.gemini.modelHint">
+                Use Gemini 3.8 Flash unless you need another provider. Cursor slugs are not API ids.
+              </p>
+            </div>
+            <div class="field field-narrow">
+              <label for="effort" data-i18n="form.effort">Effort</label>
+              <select id="effort" name="effort" aria-describedby="effort-hint"></select>
+              <p id="effort-hint" class="hint" data-i18n="form.gemini.effortHint">
+                Gemini thinking level. Medium is recommended for this OCR job.
               </p>
             </div>
             <div class="field" id="custom-model-wrap" hidden>
@@ -152,18 +162,57 @@
             </div>
           </div>
 
+          <div id="ollama-fields" hidden>
+            <div class="field">
+              <label for="ollama-url" data-i18n="form.ollama.url">Ollama URL</label>
+              <input
+                id="ollama-url"
+                name="ollama-url"
+                type="url"
+                autocomplete="off"
+                spellcheck="false"
+                value="http://127.0.0.1:11434"
+                aria-describedby="ollama-url-hint"
+              />
+              <p id="ollama-url-hint" class="hint" data-i18n="form.ollama.urlHint">
+                Loopback only. The local adapter forwards to this address. GitHub Pages cannot reach Ollama on your PC.
+              </p>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="ollama-model" data-i18n="form.ollama.modelList">Ollama vision model</label>
+                <select id="ollama-model" name="ollama-model"></select>
+              </div>
+              <div class="field field-narrow">
+                <label for="ollama-refresh" class="visually-hidden" data-i18n="form.ollama.refresh">Refresh</label>
+                <button id="ollama-refresh" type="button" data-i18n="form.ollama.refresh">Refresh</button>
+              </div>
+              <div class="field" id="ollama-custom-wrap">
+                <label for="ollama-custom" data-i18n="form.ollama.customTag">Custom Ollama tag</label>
+                <input
+                  id="ollama-custom"
+                  name="ollama-custom"
+                  type="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="qwen2.5vl"
+                />
+              </div>
+            </div>
+          </div>
+
           <div class="field checkbox-field">
             <input id="latex-math" name="latex-math" type="checkbox" />
             <label for="latex-math" data-i18n="form.latexMath">Wrap math in LaTeX (for Nemeth)</label>
           </div>
           <p class="hint latex-hint" data-i18n="form.latexHint">
-            Off by default: math is spoken plain text. When checked, Gemini wraps
+            Off by default: math is spoken plain text. When checked, the model wraps
             math in LaTeX so it can later be converted to Nemeth.
           </p>
         </fieldset>
 
-        <details class="panel advanced">
-          <summary data-i18n="form.advanced">Advanced: optional proxy URL</summary>
+        <details class="panel advanced" id="advanced-proxy">
+          <summary data-i18n="form.advanced">Advanced: optional Gemini proxy URL</summary>
           <div class="field">
             <label for="proxy-url" data-i18n="form.proxyUrl">Proxy URL</label>
             <input
@@ -175,9 +224,9 @@
               placeholder="http://127.0.0.1:8000/api/gemini"
             />
             <p class="hint" data-i18n="form.proxyHint">
-              Leave blank to call Google Gemini from this browser. Set a proxy if
-              this page cannot reach Google, using a host that forwards
-              generateContent.
+              Gemini only. Leave blank to call Google from this browser. Set a proxy if
+              this page cannot reach Google, using a host that forwards generateContent.
+              Claude, OpenAI, and Ollama always use the local adapter routes.
             </p>
           </div>
         </details>
@@ -248,21 +297,10 @@
 
       <section class="panel" aria-labelledby="progress-heading">
         <h2 id="progress-heading" data-i18n="progress.heading">Progress</h2>
-        <p id="status" role="status" aria-live="polite">Load a PDF to plan batches. Gemini is not called until you adapt.</p>
+        <p id="status" role="status" aria-live="polite">Load a PDF to plan batches. The model is not called until you adapt.</p>
         <label class="progress-label" for="progress-bar" data-i18n="progress.batchesCompleted">Batches completed</label>
         <progress id="progress-bar" max="1" value="0"></progress>
         <ul id="batch-list" class="batch-list" data-i18n-aria-label="progress.batchStatus" aria-label="Batch status"></ul>
-      </section>
-
-      <section id="issue-section" class="panel" aria-labelledby="issues-heading" hidden>
-        <h2 id="issues-heading" data-i18n="issues.heading">Style issues</h2>
-        <p class="hint" data-i18n="issues.hint">
-          After a batch finishes, forbidden characters such as ampersand, asterisk,
-          number-sign, square brackets, and braces are listed here. They do not stop
-          the run. Click a count in Progress to jump to that range. Unreadable words
-          appear as (unclear) in the downloaded text, not in this list.
-        </p>
-        <ul id="issue-list" class="issue-list"></ul>
       </section>
 
       <section id="error-section" class="panel" aria-labelledby="errors-heading" hidden>

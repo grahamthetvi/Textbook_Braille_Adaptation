@@ -32,7 +32,9 @@ export function formatRunStoppedStatus(pageRange) {
 export function formatRetryingStatus(pageRange, waitMs = 0, httpStatus = 429) {
   const seconds = Math.max(1, Math.ceil((Number(waitMs) || 0) / 1000));
   const key =
-    httpStatus === 503 ? "runControl.retryingUnavailable" : "runControl.retryingRateLimit";
+    httpStatus === 503 || httpStatus === 529
+      ? "runControl.retryingUnavailable"
+      : "runControl.retryingRateLimit";
   return t(key, { range: pageRange, seconds });
 }
 

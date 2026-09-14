@@ -17,7 +17,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from serve_adapter import AdapterHandler  # noqa: E402
+from serve_adapter import AdapterHandler, resolve_ollama_base  # noqa: E402
 
 
 class ServeAdapterTests(unittest.TestCase):
@@ -47,6 +47,10 @@ class ServeAdapterTests(unittest.TestCase):
         self.assertIn("js/app.js", body)
         self.assertIn("How to connect Gemini 3.8 Flash", body)
         self.assertIn("gemini-3.8-flash", body)
+        self.assertIn("Model access", body)
+        self.assertIn('id="effort"', body)
+        self.assertIn('id="ollama-url"', body)
+        self.assertIn("Ollama URL", body)
         self.assertIn("A failed batch, a clarification question, or blank output stops the run", body)
         self.assertIn("Download Word document", body)
         self.assertIn("Wrap math in LaTeX (for Nemeth)", body)
@@ -109,6 +113,61 @@ class ServeAdapterTests(unittest.TestCase):
         conn.close()
         self.assertEqual(response.status, 204)
         self.assertEqual(response.getheader("Access-Control-Allow-Origin"), "*")
+        allow = response.getheader("Access-Control-Allow-Headers") or ""
+        self.assertIn("authorization", allow.lower())
+        self.assertIn("anthropic-version", allow.lower())
+
+    def test_anthropic_proxy_requires_api_key(self):
+        conn = self._conn()
+        payload = json.dumps({"model": "claude-sonnet-5", "messages": []}).encode("utf-8")
+        conn.request(
+            "POST",
+            "/api/anthropic/v1/messages",
+            body=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        response = conn.getresponse()
+        body = json.loads(response.read().decode("utf-8"))
+        conn.close()
+        self.assertEqual(response.status, 401)
+        self.assertIn("API key", body["error"]["message"])
+
+    def test_openai_proxy_requires_api_key(self):
+        conn = self._conn()
+        payload = json.dumps({"model": "gpt-5.6-luna"}).encode("utf-8")
+        conn.request(
+            "POST",
+            "/api/openai/v1/responses",
+            body=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        response = conn.getresponse()
+        body = json.loads(response.read().decode("utf-8"))
+        conn.close()
+        self.assertEqual(response.status, 401)
+        self.assertIn("API key", body["error"]["message"])
+
+    def test_ollama_non_loopback_is_rejected(self):
+        conn = self._conn()
+        conn.request(
+            "GET",
+            "/api/ollama/api/tags",
+            headers={"x-ollama-url": "http://example.com:11434"},
+        )
+        response = conn.getresponse()
+        body = json.loads(response.read().decode("utf-8"))
+        conn.close()
+        self.assertEqual(response.status, 400)
+        self.assertIn("loopback", body["error"]["message"].lower())
+
+    def test_resolve_ollama_base_allows_only_loopback(self):
+        self.assertEqual(resolve_ollama_base(""), "http://127.0.0.1:11434")
+        self.assertEqual(resolve_ollama_base("http://127.0.0.1:11434"), "http://127.0.0.1:11434")
+        self.assertEqual(resolve_ollama_base("http://localhost:11434"), "http://localhost:11434")
+        self.assertEqual(resolve_ollama_base("http://[::1]:11434"), "http://[::1]:11434")
+        self.assertIsNone(resolve_ollama_base("http://example.com:11434"))
+        self.assertIsNone(resolve_ollama_base("http://192.168.1.5:11434"))
+        self.assertIsNone(resolve_ollama_base("http://user:pass@127.0.0.1:11434"))
 
 
 if __name__ == "__main__":

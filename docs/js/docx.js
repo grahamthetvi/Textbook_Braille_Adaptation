@@ -45,11 +45,130 @@ export function escapeXml(text) {
     .replace(/>/g, "&gt;");
 }
 
+function sameMarks(left, right) {
+  return (
+    Boolean(left.bold) === Boolean(right.bold) &&
+    Boolean(left.italic) === Boolean(right.italic) &&
+    Boolean(left.underline) === Boolean(right.underline)
+  );
+}
+
+/** Split a markdown line into plain, italic, bold, and underline runs. */
+export function parseInlineRuns(text, marks = {}) {
+  const source = String(text);
+  const runs = [];
+
+  const push = (value, nextMarks = marks) => {
+    if (!value) {
+      return;
+    }
+    const last = runs[runs.length - 1];
+    if (last && sameMarks(last, nextMarks)) {
+      last.text += value;
+      return;
+    }
+    runs.push({
+      text: value,
+      bold: Boolean(nextMarks.bold),
+      italic: Boolean(nextMarks.italic),
+      underline: Boolean(nextMarks.underline),
+    });
+  };
+
+  let i = 0;
+  let plain = "";
+  while (i < source.length) {
+    if (source.startsWith("$$", i)) {
+      const end = source.indexOf("$$", i + 2);
+      if (end !== -1) {
+        push(plain);
+        plain = "";
+        push(source.slice(i, end + 2));
+        i = end + 2;
+        continue;
+      }
+    }
+    if (source.startsWith("\\(", i)) {
+      const end = source.indexOf("\\)", i + 2);
+      if (end !== -1) {
+        push(plain);
+        plain = "";
+        push(source.slice(i, end + 2));
+        i = end + 2;
+        continue;
+      }
+    }
+    if (!marks.bold && source.startsWith("__", i)) {
+      const end = source.indexOf("__", i + 2);
+      if (end !== -1) {
+        push(plain);
+        plain = "";
+        runs.push(
+          ...parseInlineRuns(source.slice(i + 2, end), { ...marks, bold: true })
+        );
+        i = end + 2;
+        continue;
+      }
+    }
+    if (!marks.underline && /^<u>/i.test(source.slice(i))) {
+      const close = source.slice(i).search(/<\/u>/i);
+      if (close !== -1) {
+        push(plain);
+        plain = "";
+        runs.push(
+          ...parseInlineRuns(source.slice(i + 3, i + close), {
+            ...marks,
+            underline: true,
+          })
+        );
+        i = i + close + 4;
+        continue;
+      }
+    }
+    if (!marks.italic && source[i] === "_" && source[i + 1] !== "_") {
+      const prev = i === 0 ? "" : source[i - 1];
+      if (!/[A-Za-z0-9]/.test(prev)) {
+        const end = source.indexOf("_", i + 1);
+        if (end !== -1 && source[end + 1] !== "_") {
+          const next = end + 1 < source.length ? source[end + 1] : "";
+          const inner = source.slice(i + 1, end);
+          if (!/[A-Za-z0-9]/.test(next) && inner.length && !inner.includes("\n")) {
+            push(plain);
+            plain = "";
+            runs.push(...parseInlineRuns(inner, { ...marks, italic: true }));
+            i = end + 1;
+            continue;
+          }
+        }
+      }
+    }
+    plain += source[i];
+    i += 1;
+  }
+  push(plain);
+  return runs;
+}
+
+function runXml(run) {
+  const rPr = [];
+  if (run.bold) {
+    rPr.push("<w:b/>");
+  }
+  if (run.italic) {
+    rPr.push("<w:i/>");
+  }
+  if (run.underline) {
+    rPr.push('<w:u w:val="single"/>');
+  }
+  const props = rPr.length ? `<w:rPr>${rPr.join("")}</w:rPr>` : "";
+  return `<w:r>${props}<w:t xml:space="preserve">${escapeXml(run.text)}</w:t></w:r>`;
+}
+
 function paragraphXml(text) {
   if (!text) {
     return "<w:p/>";
   }
-  return `<w:p><w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
+  return `<w:p>${parseInlineRuns(text).map(runXml).join("")}</w:p>`;
 }
 
 const PAGE_BREAK = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';

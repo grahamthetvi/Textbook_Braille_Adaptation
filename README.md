@@ -2,27 +2,54 @@
 
 Turn scanned textbook PDFs into screen-reader-accessible markdown. This app transcribes pages; it does not produce braille. Optional LaTeX wrapping supports a later Nemeth path.
 
-The primary path is a static web app: paste a Gemini API key, drop a PDF, split it into 5–8 page batches in the browser, send each batch to Gemini 3.8 Flash, and download markdown.
+The primary path is a static web app: choose a model, drop a PDF, split it into 5–8 page batches in the browser, and download markdown. Gemini 3.8 Flash is the default. Claude, OpenAI GPT-5.6, and local Ollama vision models are available from the same page.
 
-## Connect Gemini 3.8 Flash
+## Connect a model
 
-This site calls the **Google Gemini API**, not Cursor’s model picker. The model id is `gemini-3.8-flash`. Do not use Cursor slugs such as `gemini-3.8-flash-medium` or `gemini-3.8-flash-high`.
+This site calls provider APIs, not Cursor’s model picker. **Model** and **Effort** are separate fields. Do not paste Cursor slugs such as `gemini-3.8-flash-medium`, `Sonnet 5 - high`, or `gpt-5.6-luna-high`.
+
+Recommended effort (cheaper OCR defaults, marked in the UI):
+
+| Provider | Models (API ids) | Recommended effort | API field |
+| --- | --- | --- | --- |
+| Gemini | `gemini-3.8-flash` (default), `gemini-3.1-pro-preview` | medium | `thinkingConfig.thinkingLevel` |
+| Claude | `claude-sonnet-5`, `claude-opus-5` | medium | `output_config.effort` |
+| OpenAI | `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol` | low | `reasoning.effort` (no `reasoning.mode: pro`) |
+| Ollama | local vision tag such as `qwen2.5vl` | off | `think: false` |
+
+**GitHub Pages can call Gemini directly.** Claude, OpenAI, and Ollama need the local server (`python3 scripts/serve_adapter.py`) so the page can use same-origin `/api/anthropic`, `/api/openai`, and `/api/ollama` proxies.
+
+### Gemini 3.8 Flash
 
 1. Open [Google AI Studio API keys](https://aistudio.google.com/apikey) and sign in.
 2. Create an API key in a Google Cloud project. If Google asks, enable the **Gemini API** (Generative Language API) for that project.
-3. Confirm the key can use Gemini 3.8 Flash (GA). Older keys or projects that only allow 2.x models will fail until 3.8 is available on that project.
-4. Serve the site (`python3 scripts/serve_adapter.py`) or open the GitHub Pages URL after deploy.
-5. Paste the key into **Gemini API key**. Leave **Model** on Gemini 3.8 Flash.
-6. Drop a PDF, plan batches, then Adapt book.
-7. If Gemini cannot read a batch reliably, it asks a question in the clarification panel. Answer and continue that batch.
-8. If Gemini returns no text, the app pauses and shows the original pages. Skip them if they are blank, or retry if they have lesson content. Do not auto-skip empty output; that hides model failures.
-9. Check **Wrap math in LaTeX (for Nemeth)** only when you want math wrapped as `\(...\)` or `$$...$$`. Leave it off for spoken plain-text math.
+3. Serve the site (`python3 scripts/serve_adapter.py`) or open the GitHub Pages URL after deploy.
+4. Paste the key. Leave **Model** on Gemini 3.8 Flash and **Effort** on medium (recommended).
+5. Drop a PDF, plan batches, then Adapt book.
 
-The key stays in the browser session. It is sent only to Google (`generativelanguage.googleapis.com`), or to an optional same-origin proxy. Vertex AI / Gemini Enterprise OAuth tokens are not supported here.
+The Gemini key stays in the browser session. It is sent only to Google (`generativelanguage.googleapis.com`), or to an optional same-origin Gemini proxy. Vertex AI / Gemini Enterprise OAuth tokens are not supported here.
 
-If the browser blocks Google (common on some locked-down networks), run the local server and set **Advanced: optional proxy URL** to `http://127.0.0.1:8000/api/gemini`.
+If the browser blocks Google, run the local server and set **Advanced: optional Gemini proxy URL** to `http://127.0.0.1:8000/api/gemini`.
 
-CLI equivalent:
+### Claude and OpenAI
+
+1. Run `python3 scripts/serve_adapter.py` and open `http://127.0.0.1:8000`.
+2. Choose Claude Sonnet 5 (`claude-sonnet-5`) or GPT-5.6 Luna (`gpt-5.6-luna`).
+3. Paste an [Anthropic](https://console.anthropic.com/settings/keys) or [OpenAI](https://platform.openai.com/api-keys) key. Keys are stored per provider in session storage.
+4. Leave **Effort** on the recommended value (medium for Claude, low for OpenAI).
+
+### Local Ollama
+
+Ollama does not see PDFs the way Gemini does. The adapter rasterizes each page of the 5–8 page batch and sends PNGs. You need a **vision** model (`ollama pull qwen2.5vl` or `gemma4`). Quality is usually behind Gemini 3.8 Flash on two-column scans, small print, and math — spot-check the first batch.
+
+1. Install Ollama and start it on port 11434.
+2. Run `python3 scripts/serve_adapter.py` (GitHub Pages cannot reach Ollama on your PC).
+3. Choose **Ollama (local vision)**. No API key.
+4. Confirm the URL is loopback (`http://127.0.0.1:11434`), Refresh the model list, leave **Effort** off.
+
+The local proxy only forwards to loopback Ollama URLs. It is not an open relay.
+
+CLI equivalent (Gemini only):
 
 ```bash
 python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --out-dir accessible
@@ -48,7 +75,7 @@ After you merge to `main` and enable GitHub Pages, the same app is also at:
 
 https://grahamthetvi.github.io/Textbook_Braille_Adaptation/
 
-1. Paste the Gemini API key from the steps above.
+1. Paste a provider API key (or choose Ollama with no key). Gemini works from GitHub Pages; Claude, OpenAI, and Ollama need the local server.
 2. Drop a PDF on the page.
 3. Plan batches (5–8 pages each).
 4. Optionally check **Wrap math in LaTeX (for Nemeth)**.
@@ -80,7 +107,12 @@ python3 scripts/validate_accessible.py accessible/pages-001-005.md
 python3 scripts/validate_accessible.py --latex-math accessible/pages-001-005.md
 ```
 
-`scripts/serve_adapter.py` also exposes `POST /api/gemini/models/<model>:generateContent` so the page can use a same-origin proxy instead of calling Google directly.
+`scripts/serve_adapter.py` proxies:
+
+- `POST /api/gemini/models/<model>:generateContent`
+- `POST /api/anthropic/v1/messages`
+- `POST /api/openai/v1/responses`
+- `GET|POST /api/ollama/api/tags` and `POST /api/ollama/api/chat` (loopback Ollama only)
 
 ## Optional Cursor in-repo path
 
@@ -112,6 +144,7 @@ Accessible files follow `.cursor/rules/accessible-document-style.mdc`:
 
 - Preserve paragraphs and lesson content for screen readers.
 - Use headings, lists (including nested lists), and tables. Number or letter questions under a numbered item.
+- Keep italic, bold, and underlined print as `_italics_`, `__bold__`, and `<u>underlined</u>`. Headings are plain title lines, not `#` markdown.
 - Format multi-digit numbers with commas when helpful; dates and phones with hyphens.
 - Add transcriber notes only when a visual cannot be converted accessibly.
 - Avoid `[]`, `{}`, `#`, `&`, and `*` unless they appear in the source. In LaTeX math mode, braces inside math spans are allowed.
@@ -119,6 +152,6 @@ Accessible files follow `.cursor/rules/accessible-document-style.mdc`:
 
 ## What you still need
 
-- A Gemini API key from Google AI Studio that can call `gemini-3.8-flash`.
+- A provider API key (Gemini from Google AI Studio, or Anthropic / OpenAI for those models), or a local Ollama vision model.
 - Human review of math, diagrams, and `(unclear)` markers.
-- GitHub Pages enabled if you want the public site URL after merge.
+- GitHub Pages enabled if you want the public site URL after merge. The Pages URL is Gemini-only unless you run the local adapter.
