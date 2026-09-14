@@ -29,12 +29,12 @@ API_ROOT = "https://generativelanguage.googleapis.com/v1beta"
 STYLE_REMINDER = """Role: Produce screen-reader-accessible text from scanned textbook pages. Do not output braille, contractions, or braille ASCII. Transcribe faithfully. Do not change lesson content.
 
 When stuck
-If you cannot reliably make the content accessible (illegible text, ambiguous layout, a diagram the lesson depends on, or uncertain math), do not guess. Ask one short specific question. If several issues, ask the most blocking one first. Return only the following block, with no transcription before or after it:
+If you cannot reliably make the content accessible (illegible text, ambiguous layout, a diagram the lesson depends on, or uncertain math), do not guess. Ask one short specific question. If several issues, ask the most blocking one first. Prefer a CLARIFY-only reply. If you already started transcribing, still end with the following block:
 
 CLARIFY:
 <one question>
 
-After the user answers, transcribe the batch. If you still cannot, return only another CLARIFY block.
+After the user answers, transcribe the complete batch. If you still cannot, end with another CLARIFY block.
 
 Formatting
 Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines.
@@ -79,7 +79,8 @@ def build_interpretation_prompt(page_range: str, *, latex_math: bool = False) ->
         "Do not output braille, contractions, or braille ASCII.\n"
         "\n"
         "Follow the system instruction. Transcribe faithfully. If you cannot reliably "
-        "make the content accessible, return only a CLARIFY block. Nested lists are "
+        "make the content accessible, end with a CLARIFY block. Prefer a CLARIFY-only "
+        "reply. Nested lists are "
         "allowed. Number or letter questions when they sit under a numbered item. Use "
         "paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. "
         "Avoid square brackets, braces, asterisk, and number-sign unless they appear "
@@ -95,12 +96,29 @@ def build_interpretation_prompt(page_range: str, *, latex_math: bool = False) ->
     )
 
 
-def parse_clarify(text: str) -> str | None:
+def parse_clarify_response(text: str) -> dict[str, str] | None:
     trimmed = (text or "").strip()
-    match = re.match(r"^CLARIFY:\s*([\s\S]*)$", trimmed, flags=re.I)
+    if not trimmed:
+        return None
+    match = re.match(
+        r"^(?:(?P<draft>[\s\S]*)\r?\n)?(?P<marker>CLARIFY|ACLARAR|توضيح):\s*(?P<question>[\s\S]*)$",
+        trimmed,
+        flags=re.I,
+    )
     if not match:
         return None
-    return match.group(1).strip()
+    return {
+        "question": (match.group("question") or "").strip(),
+        "draft": (match.group("draft") or "").strip(),
+        "marker": (match.group("marker") or "CLARIFY").strip(),
+    }
+
+
+def parse_clarify(text: str) -> str | None:
+    parsed = parse_clarify_response(text)
+    if parsed is None:
+        return None
+    return parsed["question"]
 
 
 def format_clarify_needed(page_range: str, question: str) -> str:

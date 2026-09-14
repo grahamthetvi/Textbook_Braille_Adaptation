@@ -41,7 +41,7 @@
     <header class="site-header">
       <div class="site-toolbar" role="group" data-i18n-aria-label="toolbar.displayOptions" aria-label="Display options">
         <label for="locale-select" data-i18n="toolbar.language">Language</label>
-        <select id="locale-select" name="locale">
+        <select id="locale-select" name="locale" aria-describedby="locale-hint">
           <option value="en">English</option>
           <option value="es">Español</option>
           <option value="ar">العربية</option>
@@ -50,6 +50,10 @@
           Dark mode
         </button>
       </div>
+      <p id="locale-hint" class="hint locale-hint" data-i18n="header.languageHint">
+        Gemini asks clarification questions in this language and marks unreadable
+        words in this language. Printed lesson text stays in the language of the book.
+      </p>
       <p class="eyebrow" data-i18n="header.eyebrow">Accessible textbook prep</p>
       <h1 data-i18n="header.title">Textbook Adapter</h1>
       <p class="lede" data-i18n="header.lede">
@@ -219,11 +223,16 @@
       <section id="clarify-section" class="panel" aria-labelledby="clarify-heading" hidden>
         <h2 id="clarify-heading" data-i18n="clarify.heading">Clarification needed</h2>
         <p class="hint" data-i18n="clarify.hint">
-          Gemini paused this batch. Answer the question to continue. Remaining
-          pending batches wait until this one finishes. You can also retry from
-          scratch without answering.
+          Gemini paused this batch. It may already have started a transcription.
+          Answer the question to continue; the draft and your answer go back to
+          Gemini. Remaining pending batches wait until this one finishes. You can
+          also retry from scratch without answering.
         </p>
         <p id="clarify-meta" class="file-meta"></p>
+        <div id="clarify-draft-wrap" class="clarify-draft-wrap" hidden>
+          <h3 id="clarify-draft-heading" data-i18n="clarify.draftHeading">Draft so far</h3>
+          <pre id="clarify-draft" class="clarify-draft"></pre>
+        </div>
         <p id="clarify-question" class="clarify-question"></p>
         <div class="field">
           <label for="clarify-answer" data-i18n="clarify.answer">Your answer</label>
@@ -241,6 +250,17 @@
         <label class="progress-label" for="progress-bar" data-i18n="progress.batchesCompleted">Batches completed</label>
         <progress id="progress-bar" max="1" value="0"></progress>
         <ul id="batch-list" class="batch-list" data-i18n-aria-label="progress.batchStatus" aria-label="Batch status"></ul>
+      </section>
+
+      <section id="issue-section" class="panel" aria-labelledby="issues-heading" hidden>
+        <h2 id="issues-heading" data-i18n="issues.heading">Style issues</h2>
+        <p class="hint" data-i18n="issues.hint">
+          After a batch finishes, forbidden characters such as ampersand, asterisk,
+          number-sign, square brackets, and braces are listed here. They do not stop
+          the run. Click a count in Progress to jump to that range. Unreadable words
+          appear as (unclear) in the downloaded text, not in this list.
+        </p>
+        <ul id="issue-list" class="issue-list"></ul>
       </section>
 
       <section id="error-section" class="panel" aria-labelledby="errors-heading" hidden>

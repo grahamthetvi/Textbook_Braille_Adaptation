@@ -7,6 +7,7 @@ import {
   buildInterpretationPrompt,
   buildStyleRules,
   formatClarifyFollowUp,
+  formatClarifyModelTurn,
   pageRangeLabel,
 } from "./prompt.js";
 import { stripModelFences } from "./validate.js";
@@ -145,6 +146,7 @@ export function buildTranscribeContents({
   pdfBytes,
   latexMath = false,
   clarifyHistory = [],
+  locale = "en",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
   const contents = [
@@ -157,18 +159,19 @@ export function buildTranscribeContents({
             data: bytesToBase64(pdfBytes),
           },
         },
-        { text: buildInterpretationPrompt(pageRange, { latexMath }) },
+        { text: buildInterpretationPrompt(pageRange, { latexMath, locale }) },
       ],
     },
   ];
   for (const turn of clarifyHistory || []) {
+    const turnLocale = turn.locale || locale;
     contents.push({
       role: "model",
-      parts: [{ text: `CLARIFY:\n${turn.question}` }],
+      parts: [{ text: formatClarifyModelTurn(turn, { locale: turnLocale }) }],
     });
     contents.push({
       role: "user",
-      parts: [{ text: formatClarifyFollowUp(turn.answer) }],
+      parts: [{ text: formatClarifyFollowUp(turn.answer, { draft: turn.draft, locale: turnLocale }) }],
     });
   }
   return contents;
@@ -188,10 +191,11 @@ export async function transcribeBatch({
   sleepFn = sleep,
   latexMath = false,
   clarifyHistory = [],
+  locale = "en",
 }) {
   const body = {
     system_instruction: {
-      parts: [{ text: buildStyleRules(latexMath) }],
+      parts: [{ text: buildStyleRules(latexMath, { locale }) }],
     },
     contents: buildTranscribeContents({
       startPage,
@@ -199,6 +203,7 @@ export async function transcribeBatch({
       pdfBytes,
       latexMath,
       clarifyHistory,
+      locale,
     }),
     generationConfig: buildGenerationConfig(model),
   };

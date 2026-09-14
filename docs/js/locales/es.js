@@ -10,6 +10,8 @@ export const es = {
   "toolbar.displayOptions": "Opciones de visualización",
   "toolbar.language": "Idioma",
   "toolbar.darkMode": "Modo oscuro",
+  "header.languageHint":
+    "Gemini hace las preguntas de aclaración en este idioma y marca las palabras ilegibles en este idioma. El texto de la lección impresa se mantiene en el idioma del libro.",
 
   "form.geminiAccess": "Acceso a Gemini",
   "form.apiKey": "Clave de API de Gemini",
@@ -49,7 +51,8 @@ export const es = {
 
   "clarify.heading": "Se necesita una aclaración",
   "clarify.hint":
-    "Gemini pausó este lote. Responde la pregunta para continuar. Los lotes pendientes restantes esperan hasta que este termine. También puedes reintentar desde cero sin responder.",
+    "Gemini pausó este lote. Puede que ya haya empezado a transcribir. Responde la pregunta para continuar; el borrador y tu respuesta vuelven a Gemini. Los lotes pendientes restantes esperan hasta que este termine. También puedes reintentar desde cero sin responder.",
+  "clarify.draftHeading": "Borrador hasta ahora",
   "clarify.answer": "Tu respuesta",
   "clarify.continue": "Continuar este lote",
   "clarify.retry": "Reintentar desde cero",
@@ -129,6 +132,10 @@ export const es = {
   "batch.issueOne": "1 problema",
   "batch.issues": "{count} problemas",
   "batch.emDash": "—",
+
+  "issues.heading": "Problemas de estilo",
+  "issues.hint":
+    "Cuando termina un lote, aquí aparecen caracteres prohibidos como el ampersand, el asterisco, el numeral, los corchetes y las llaves. No detienen la ejecución. Pulsa un recuento en Progreso para ir a ese rango. Las palabras ilegibles aparecen como (poco claro) en el texto descargado, no en esta lista.",
 
   "file.onePage": "{fileName} · 1 página",
   "file.pages": "{fileName} · {count} páginas",

@@ -6,11 +6,12 @@
 import { splitPdfBytes, inspectPdf, extractPagePdfs } from "./pdf-split.js";
 import { renderPageCanvas } from "./pdf-preview.js";
 import { transcribeBatch, MODEL_OPTIONS, DEFAULT_MODEL } from "./gemini.js";
-import { parseClarify } from "./prompt.js";
+import { parseClarifyResponse } from "./prompt.js";
 import { validateMarkdown } from "./validate.js";
 import { downloadCombined, downloadDocx, downloadZip } from "./download.js";
 import { planBatches, padPage } from "./batches.js";
 import { applyTranscriptionError, formatPageRange, formatRetryingStatus } from "./run-control.js";
+import { batchesWithStyleIssues, excerptForIssue, issueGroupId } from "./issues.js";
 import {
   applyTranslations,
   detectLocale,
@@ -89,6 +90,8 @@ function cacheElements() {
   els.clarifyAnswer = document.getElementById("clarify-answer");
   els.clarifyContinueBtn = document.getElementById("clarify-continue-btn");
   els.clarifyRetryBtn = document.getElementById("clarify-retry-btn");
+  els.clarifyDraftWrap = document.getElementById("clarify-draft-wrap");
+  els.clarifyDraft = document.getElementById("clarify-draft");
   els.localeSelect = document.getElementById("locale-select");
   els.themeToggle = document.getElementById("theme-toggle");
   els.blankSection = document.getElementById("blank-section");
@@ -96,6 +99,8 @@ function cacheElements() {
   els.blankPages = document.getElementById("blank-pages");
   els.blankSkipBtn = document.getElementById("blank-skip-btn");
   els.blankRetryBtn = document.getElementById("blank-retry-btn");
+  els.issueSection = document.getElementById("issue-section");
+  els.issueList = document.getElementById("issue-list");
 }
 
 function getPreferredBatchSize() {
@@ -252,9 +257,14 @@ function renderBatchList() {
     if (batch.status === "done") {
       if (batch.skippedBlank) {
         issues.textContent = t("batch.skippedBlank");
-      } else {
+      } else if (batch.issues.length) {
+        const link = document.createElement("a");
+        link.href = `#${issueGroupId(batch.startPage, batch.endPage)}`;
         const count = batch.issues.length;
-        issues.textContent = count === 1 ? t("batch.issueOne") : t("batch.issues", { count });
+        link.textContent = count === 1 ? t("batch.issueOne") : t("batch.issues", { count });
+        issues.append(link);
+      } else {
+        issues.textContent = t("batch.issues", { count: 0 });
       }
     } else {
       issues.textContent = t("batch.emDash");
@@ -262,6 +272,44 @@ function renderBatchList() {
 
     row.append(range, status, issues);
     els.batchList.append(row);
+  }
+}
+
+function renderIssues() {
+  const flagged = batchesWithStyleIssues(state.batches);
+  els.issueList.replaceChildren();
+  els.issueSection.hidden = flagged.length === 0;
+
+  for (const batch of flagged) {
+    const group = document.createElement("li");
+    group.className = "issue-group";
+    group.id = issueGroupId(batch.startPage, batch.endPage);
+
+    const heading = document.createElement("h3");
+    heading.textContent = t("batch.pages", {
+      range: formatPageRange(batch.startPage, batch.endPage),
+    });
+
+    const list = document.createElement("ul");
+    list.className = "issue-detail-list";
+    for (const message of batch.issues) {
+      const item = document.createElement("li");
+      const text = document.createElement("p");
+      text.className = "issue-message";
+      text.textContent = message;
+      item.append(text);
+      const excerpt = excerptForIssue(batch.markdown, message);
+      if (excerpt) {
+        const quote = document.createElement("p");
+        quote.className = "issue-excerpt";
+        quote.textContent = excerpt;
+        item.append(quote);
+      }
+      list.append(item);
+    }
+
+    group.append(heading, list);
+    els.issueList.append(group);
   }
 }
 
@@ -295,16 +343,21 @@ function renderClarify() {
   const batch = state.batches.find((item) => item.status === "clarify");
   if (!batch) {
     els.clarifySection.hidden = true;
+    els.clarifyDraftWrap.hidden = true;
+    els.clarifyDraft.textContent = "";
     state.lastClarifyKey = "";
     return;
   }
 
   const pageRange = formatPageRange(batch.startPage, batch.endPage);
+  const draft = String(batch.clarifyDraft || "").trim();
   els.clarifySection.hidden = false;
   els.clarifyMeta.textContent = t("clarify.pages", { range: pageRange });
+  els.clarifyDraftWrap.hidden = !draft;
+  els.clarifyDraft.textContent = draft;
   els.clarifyQuestion.textContent = batch.clarifyQuestion || t("clarify.missingQuestion");
 
-  const key = `${batch.startPage}-${batch.endPage}-${batch.clarifyQuestion}`;
+  const key = `${batch.startPage}-${batch.endPage}-${batch.clarifyQuestion}-${draft}`;
   if (key !== state.lastClarifyKey) {
     state.lastClarifyKey = key;
     els.clarifyAnswer.value = "";
@@ -429,6 +482,8 @@ function pauseForBlankReview(batch, pageRange) {
   batch.status = "blank";
   batch.error = "";
   batch.clarifyQuestion = "";
+  batch.clarifyDraft = "";
+  batch.clarifyMarker = "";
   batch.skippedBlank = false;
   setAlert("");
   setStatus("status.pausedBlank", { range: pageRange });
@@ -453,6 +508,7 @@ function render() {
   }
   renderProgress();
   renderBatchList();
+  renderIssues();
   renderBlankReview();
   renderClarify();
   renderErrors();
@@ -486,7 +542,10 @@ function resetBatchesFromRanges(ranges) {
     issues: [],
     error: "",
     clarifyQuestion: "",
+    clarifyDraft: "",
+    clarifyMarker: "",
     clarifyHistory: [],
+    locale: "",
     skippedBlank: false,
   }));
 }
@@ -558,7 +617,10 @@ function mergeSplitBatches(split) {
       issues: previous?.issues || [],
       error: previous?.error || "",
       clarifyQuestion: previous?.clarifyQuestion || "",
+      clarifyDraft: previous?.clarifyDraft || "",
+      clarifyMarker: previous?.clarifyMarker || "",
       clarifyHistory: previous?.clarifyHistory || [],
+      locale: previous?.locale || "",
       skippedBlank: Boolean(previous?.skippedBlank),
     };
   });
@@ -635,6 +697,9 @@ async function runAdaptation({ retryOnly = null } = {}) {
 
       batch.status = "running";
       batch.error = "";
+      if (!batch.locale) {
+        batch.locale = getLocale();
+      }
       const pageRange = formatPageRange(batch.startPage, batch.endPage);
       setStatus("status.batchProgress", { index: index + 1, total, range: pageRange });
       render();
@@ -650,6 +715,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
             proxyUrl: els.proxyUrl.value.trim(),
             signal: state.abortController.signal,
             latexMath,
+            locale: batch.locale || getLocale(),
             clarifyHistory: batch.clarifyHistory || [],
             onRetry({ waitMs, httpStatus }) {
               batch.status = "retrying";
@@ -663,11 +729,13 @@ async function runAdaptation({ retryOnly = null } = {}) {
               render();
             },
           });
-          const clarifyQuestion = parseClarify(markdown);
-          if (clarifyQuestion !== null) {
+          const parsedClarify = parseClarifyResponse(markdown);
+          if (parsedClarify) {
             batch.markdown = "";
             batch.issues = [];
-            batch.clarifyQuestion = clarifyQuestion;
+            batch.clarifyQuestion = parsedClarify.question;
+            batch.clarifyDraft = parsedClarify.draft;
+            batch.clarifyMarker = parsedClarify.marker || "";
             batch.status = "clarify";
             batch.error = "";
             setAlert("");
@@ -684,6 +752,8 @@ async function runAdaptation({ retryOnly = null } = {}) {
           batch.status = "done";
           batch.error = "";
           batch.clarifyQuestion = "";
+          batch.clarifyDraft = "";
+          batch.clarifyMarker = "";
           batch.skippedBlank = false;
           break;
         } catch (err) {
@@ -750,7 +820,10 @@ function retryBatch(batch) {
   batch.status = "pending";
   batch.error = "";
   batch.clarifyQuestion = "";
+  batch.clarifyDraft = "";
+  batch.clarifyMarker = "";
   batch.clarifyHistory = [];
+  batch.locale = "";
   batch.skippedBlank = false;
   hideBlankReview();
   render();
@@ -813,11 +886,19 @@ function continueClarify() {
   }
   batch.clarifyHistory = [
     ...(batch.clarifyHistory || []),
-    { question: batch.clarifyQuestion, answer },
+    {
+      question: batch.clarifyQuestion,
+      answer,
+      draft: batch.clarifyDraft || "",
+      marker: batch.clarifyMarker || "",
+      locale: batch.locale || "",
+    },
   ];
   batch.status = "pending";
   batch.error = "";
   batch.clarifyQuestion = "";
+  batch.clarifyDraft = "";
+  batch.clarifyMarker = "";
   els.clarifyAnswer.value = "";
   setAlert("");
   runAdaptation({ retryOnly: batch });

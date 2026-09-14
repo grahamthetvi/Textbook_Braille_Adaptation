@@ -120,6 +120,11 @@ main {
   min-width: 8rem;
 }
 
+.locale-hint {
+  margin: -0.55rem 0 1rem;
+  max-width: 36rem;
+}
+
 .eyebrow {
   margin: 0 0 0.4rem;
   font-size: 0.78rem;
@@ -375,7 +380,8 @@ progress {
 }
 
 .batch-list,
-.error-list {
+.error-list,
+.issue-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -393,8 +399,58 @@ progress {
   font-size: 0.95rem;
 }
 
+.batch-issues a {
+  color: var(--accent-ink);
+}
+
+.issue-group {
+  padding: 0.7rem 0.15rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.issue-group:target {
+  background: var(--accent-soft);
+}
+
+.issue-group h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.issue-detail-list {
+  margin: 0;
+  padding-inline-start: 1.2rem;
+}
+
+.issue-message,
+.issue-excerpt {
+  margin: 0;
+}
+
+.issue-excerpt {
+  margin: 0.15rem 0 0.55rem;
+  color: var(--ink-muted);
+  font-size: 0.95rem;
+}
+
 .latex-hint {
   margin: -0.35rem 0 0;
+}
+
+.clarify-draft-wrap h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.clarify-draft {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 0.95rem;
 }
 
 .clarify-question {

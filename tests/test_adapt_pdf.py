@@ -38,6 +38,7 @@ from adapt_pdf import (  # noqa: E402
     is_retryable_http_status,
     parse_args,
     parse_clarify,
+    parse_clarify_response,
     retry_delay_seconds,
     run_transcriptions,
     transcribe_pdf_bytes,
@@ -126,7 +127,17 @@ class AdaptPdfPromptTests(unittest.TestCase):
         self.assertEqual(parse_clarify("CLARIFY:\nIs the figure a pie chart?"), "Is the figure a pie chart?")
         self.assertEqual(parse_clarify("clarify:\nWhat is the printed fraction?"), "What is the printed fraction?")
         self.assertIsNone(parse_clarify("Lesson title\n\n1. Identify adjectives"))
+        self.assertEqual(parse_clarify("Lesson title\n\nCLARIFY:\nIs this a map?"), "Is this a map?")
         self.assertEqual(parse_clarify("CLARIFY:"), "")
+        self.assertEqual(
+            parse_clarify_response("Lesson title\n\nCLARIFY:\nIs this a map?"),
+            {"question": "Is this a map?", "draft": "Lesson title", "marker": "CLARIFY"},
+        )
+        self.assertEqual(parse_clarify("Título\n\nACLARAR:\n¿Es un mapa?"), "¿Es un mapa?")
+        self.assertEqual(
+            parse_clarify_response("العنوان\n\nتوضيح:\nهل هذه خريطة؟")["question"],
+            "هل هذه خريطة؟",
+        )
 
     def test_latex_math_cli_flag(self):
         self.assertTrue(parse_args(["book.pdf", "--latex-math"]).latex_math)
@@ -392,6 +403,34 @@ class AdaptPdfClarifyAndLatexRequestTests(unittest.TestCase):
         self.assertIn("CLI has no chat", str(raised.exception))
         self.assertIn("Is the figure a pie chart?", str(raised.exception))
         self.assertIn("001-005", str(raised.exception))
+
+    def test_clarify_after_draft_transcription_also_fails_the_batch(self):
+        def mixed(request, timeout=180):
+            payload = {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": "Lesson title\n\nCLARIFY:\nIs this a map?"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+            return _FakeResponse(json.dumps(payload).encode("utf-8"))
+
+        with self.assertRaises(RuntimeError) as raised:
+            transcribe_pdf_bytes(
+                b"%PDF-fake",
+                "001-005",
+                "test-key",
+                "gemini-3.8-flash",
+                urlopen_fn=mixed,
+            )
+        self.assertIn("CLI has no chat", str(raised.exception))
+        self.assertIn("Is this a map?", str(raised.exception))
 
     def test_latex_math_includes_wrapping_instruction_in_request(self):
         captured = {}

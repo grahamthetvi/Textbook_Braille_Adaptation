@@ -10,6 +10,8 @@ export const en = {
   "toolbar.displayOptions": "Display options",
   "toolbar.language": "Language",
   "toolbar.darkMode": "Dark mode",
+  "header.languageHint":
+    "Gemini asks clarification questions in this language and marks unreadable words in this language. Printed lesson text stays in the language of the book.",
 
   "form.geminiAccess": "Gemini access",
   "form.apiKey": "Gemini API key",
@@ -49,7 +51,8 @@ export const en = {
 
   "clarify.heading": "Clarification needed",
   "clarify.hint":
-    "Gemini paused this batch. Answer the question to continue. Remaining pending batches wait until this one finishes. You can also retry from scratch without answering.",
+    "Gemini paused this batch. It may already have started a transcription. Answer the question to continue; the draft and your answer go back to Gemini. Remaining pending batches wait until this one finishes. You can also retry from scratch without answering.",
+  "clarify.draftHeading": "Draft so far",
   "clarify.answer": "Your answer",
   "clarify.continue": "Continue this batch",
   "clarify.retry": "Retry from scratch",
@@ -127,6 +130,10 @@ export const en = {
   "batch.issueOne": "1 issue",
   "batch.issues": "{count} issues",
   "batch.emDash": "—",
+
+  "issues.heading": "Style issues",
+  "issues.hint":
+    "After a batch finishes, forbidden characters such as ampersand, asterisk, number-sign, square brackets, and braces are listed here. They do not stop the run. Click a count in Progress to jump to that range. Unreadable words appear as (unclear) in the downloaded text, not in this list.",
 
   "file.onePage": "{fileName} · 1 page",
   "file.pages": "{fileName} · {count} pages",
