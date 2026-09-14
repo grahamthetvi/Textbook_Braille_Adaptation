@@ -80,6 +80,7 @@ class AdaptPdfPromptTests(unittest.TestCase):
         self.assertIn("screen-reader-accessible", STYLE_REMINDER)
         self.assertIn("CLARIFY:", STYLE_REMINDER)
         self.assertIn("(unclear)", STYLE_REMINDER)
+        self.assertIn("Do not return an empty reply when printed lesson text is visible", STYLE_REMINDER)
         self.assertNotIn("later Grade 2 braille", STYLE_REMINDER)
         self.assertNotIn("Grade 2 braille translation", STYLE_REMINDER)
         self.assertNotIn("[unclear]", STYLE_REMINDER)

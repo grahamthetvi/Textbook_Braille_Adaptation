@@ -210,13 +210,15 @@
           Gemini returned no text for this batch. That can mean the source pages
           are blank, or that the model missed printed content. Compare the
           original pages, then skip them if they are blank or retry if they have
-          lesson text. Remaining pending batches wait until you choose.
+          lesson text. Retry tells Gemini a reviewer confirmed printed text, so
+          it must transcribe these pages instead of returning empty. Remaining
+          pending batches wait until you choose.
         </p>
         <p id="blank-meta" class="file-meta"></p>
         <div id="blank-pages" class="blank-pages"></div>
         <div class="actions blank-actions">
           <button id="blank-skip-btn" type="button" data-i18n="blank.skip">Skip as blank</button>
-          <button id="blank-retry-btn" type="button" data-i18n="blank.retry">Retry this batch</button>
+          <button id="blank-retry-btn" type="button" data-i18n="blank.retry">Retry — pages have text</button>
         </div>
       </section>
 

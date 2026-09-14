@@ -75,6 +75,8 @@ GOOD: skip decorative word clouds unless specific words are required for the les
 GOOD: transcribe the book title, edition, and copyright block on a cover when printed as normal text
 GOOD: `Transcriber note: A decorative word cloud fills the cover; no lesson text is present.` when the page has no readable lesson content
 BAD: dropping a page because Gemini returned no text, without checking the original scan
+BAD: an empty model reply when the scan has printed lesson text
+GOOD: transcribe the printed text; if you cannot, ask a CLARIFY question. Empty output is only for pages with no printed marks
 GOOD: `Transcriber note: Source pages 006-010 were blank and skipped after visual review.` when the original pages are confirmed blank
 
 ## URLs and web addresses

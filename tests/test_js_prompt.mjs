@@ -12,6 +12,7 @@ import {
   parseClarifyResponse,
   languageInstruction,
   resolveOutputLanguage,
+  formatEmptyRetryInstruction,
 } from "../docs/js/prompt.js";
 
 test("STYLE_RULES is screen-reader agent copy, not Grade 2 as the primary goal", () => {
@@ -19,6 +20,7 @@ test("STYLE_RULES is screen-reader agent copy, not Grade 2 as the primary goal",
   assert.match(STYLE_RULES, /CLARIFY:/);
   assert.match(STYLE_RULES, /Nested and indented lists are allowed/);
   assert.match(STYLE_RULES, /\(unclear\)/);
+  assert.match(STYLE_RULES, /Do not return an empty reply when printed lesson text is visible/);
   assert.doesNotMatch(STYLE_RULES, /later Grade 2 braille/);
   assert.doesNotMatch(STYLE_RULES, /Grade 2 braille translation/);
   assert.doesNotMatch(STYLE_RULES, /\[unclear\]/);
@@ -31,6 +33,7 @@ test("buildInterpretationPrompt mentions screen reader and nested lists", () => 
   assert.match(prompt, /Nested lists are allowed/);
   assert.match(prompt, /\(unclear\)/);
   assert.match(prompt, /001-005/);
+  assert.doesNotMatch(prompt, /Retry after empty output/);
   assert.equal(prompt.includes(PLAIN_MATH_INSTRUCTION), true);
   assert.equal(prompt.includes(LATEX_MATH_INSTRUCTION), false);
   assert.doesNotMatch(prompt, /Grade 2 braille translation/);
@@ -70,6 +73,22 @@ test("Spanish and Arabic UI locales ask Gemini to write questions with localized
   assert.match(formatClarifyFollowUp("Sí, un mapa.", { locale: "es" }), /ACLARAR:/);
   assert.match(formatClarifyFollowUp("Sí, un mapa.", { locale: "es" }), /\(poco claro\)/);
   assert.doesNotMatch(formatClarifyFollowUp("Yes."), /ACLARAR:/);
+});
+
+test("empty-output retry tells Gemini a reviewer confirmed printed text", () => {
+  const firstTry = buildInterpretationPrompt("001-005");
+  assert.doesNotMatch(firstTry, /reviewer looked at the original scans/);
+  const retry = buildInterpretationPrompt("001-005", { emptyRetry: true });
+  assert.match(retry, /Retry after empty output/);
+  assert.match(retry, /reviewer looked at the original scans/);
+  assert.match(retry, /previous reply was empty/);
+  assert.match(retry, /Do not return empty output/);
+  assert.match(retry, /CLARIFY/);
+  assert.match(retry, /\(unclear\)/);
+  const spanish = formatEmptyRetryInstruction({ locale: "es" });
+  assert.match(spanish, /ACLARAR/);
+  assert.match(spanish, /\(poco claro\)/);
+  assert.match(buildInterpretationPrompt("006-010", { emptyRetry: true, locale: "ar" }), /توضيح/);
 });
 
 test("parseClarify detects a trailing CLARIFY block after a draft", () => {

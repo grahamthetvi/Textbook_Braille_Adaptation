@@ -547,6 +547,7 @@ function resetBatchesFromRanges(ranges) {
     clarifyHistory: [],
     locale: "",
     skippedBlank: false,
+    emptyRetry: false,
   }));
 }
 
@@ -622,6 +623,7 @@ function mergeSplitBatches(split) {
       clarifyHistory: previous?.clarifyHistory || [],
       locale: previous?.locale || "",
       skippedBlank: Boolean(previous?.skippedBlank),
+      emptyRetry: Boolean(previous?.emptyRetry),
     };
   });
 }
@@ -701,7 +703,15 @@ async function runAdaptation({ retryOnly = null } = {}) {
         batch.locale = getLocale();
       }
       const pageRange = formatPageRange(batch.startPage, batch.endPage);
-      setStatus("status.batchProgress", { index: index + 1, total, range: pageRange });
+      if (batch.emptyRetry) {
+        setStatus("status.batchProgressEmptyRetry", {
+          index: index + 1,
+          total,
+          range: pageRange,
+        });
+      } else {
+        setStatus("status.batchProgress", { index: index + 1, total, range: pageRange });
+      }
       render();
 
       for (;;) {
@@ -717,6 +727,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
             latexMath,
             locale: batch.locale || getLocale(),
             clarifyHistory: batch.clarifyHistory || [],
+            emptyRetry: Boolean(batch.emptyRetry),
             onRetry({ waitMs, httpStatus }) {
               batch.status = "retrying";
               batch.error = "";
@@ -866,6 +877,7 @@ function retryBlankBatch() {
   if (!batch) {
     return;
   }
+  batch.emptyRetry = true;
   retryBatch(batch);
 }
 
