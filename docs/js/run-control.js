@@ -6,6 +6,7 @@ import {
   UNAVAILABLE_RETRYING,
   isRetryableHttpStatus,
 } from "./gemini.js";
+import { t } from "./i18n.js";
 
 export const REMAINING_NOT_SENT =
   "Remaining batches were not sent because of this failure.";
@@ -18,18 +19,22 @@ export function formatPageRange(startPage, endPage) {
 }
 
 export function formatRunStoppedAlert(pageRange, errorMessage) {
-  return `pages ${pageRange} failed: ${errorMessage} ${REMAINING_NOT_SENT}`;
+  return t("runControl.failedAlert", {
+    pageRange,
+    error: errorMessage,
+    remaining: t("runControl.remainingNotSent"),
+  });
 }
 
 export function formatRunStoppedStatus(pageRange) {
-  return `Stopped after pages ${pageRange} failed. Retry that range, or Adapt book to resume remaining pending batches.`;
+  return t("runControl.stoppedStatus", { pageRange });
 }
 
 export function formatRetryingStatus(pageRange, waitMs = 0, httpStatus = 429) {
   const seconds = Math.max(1, Math.ceil((Number(waitMs) || 0) / 1000));
-  const reason =
-    httpStatus === 503 ? "Gemini is temporarily unavailable" : "Rate limited";
-  return `pages ${pageRange}: ${reason}. Waiting ${seconds}s, then retrying this batch.`;
+  const key =
+    httpStatus === 503 ? "runControl.retryingUnavailable" : "runControl.retryingRateLimit";
+  return t(key, { pageRange, seconds });
 }
 
 export function isAbortError(err) {
@@ -67,7 +72,7 @@ export function applyTranscriptionError(batch, err) {
       batchStatus: "pending",
       error: "",
       alertMessage: "",
-      statusMessage: CANCELLED_STATUS,
+      statusMessage: t("runControl.cancelled"),
       pageRange,
     };
   }
@@ -85,7 +90,7 @@ export function applyTranscriptionError(batch, err) {
     };
   }
 
-  const errorMessage = String(err?.message || "This batch failed.");
+  const errorMessage = String(err?.message || t("errors.batchFailed"));
   return {
     kind: "stop",
     batchStatus: "error",

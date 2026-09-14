@@ -279,6 +279,30 @@ test("default Gemini request uses plain-text math and screen-reader prompt", asy
   assert.doesNotMatch(user, /Grade 2 braille translation/);
 });
 
+test("Spanish locale adds a website-language instruction to the Gemini request", async () => {
+  let body;
+  await transcribeBatch({
+    apiKey: "test-key",
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    locale: "es",
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return jsonResponse(200, {
+        candidates: [{ content: { parts: [{ text: "Lesson title" }] } }],
+      });
+    },
+  });
+  const system = body.system_instruction.parts[0].text;
+  const user = body.contents[0].parts[1].text;
+  assert.match(system, /Website language: Spanish/);
+  assert.match(user, /Website language: Spanish/);
+  assert.match(system, /ACLARAR:/);
+  assert.match(system, /\(poco claro\)/);
+  assert.match(system, /do not translate the lesson/i);
+});
+
 test("clarify history is sent as a follow-up turn with the same PDF", () => {
   const contents = buildTranscribeContents({
     startPage: 1,
@@ -295,6 +319,59 @@ test("clarify history is sent as a follow-up turn with the same PDF", () => {
   assert.match(contents[2].parts[0].text, /transcribe this batch now/i);
 });
 
+test("clarify follow-up in Spanish uses ACLARAR and (poco claro)", () => {
+  const contents = buildTranscribeContents({
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    locale: "es",
+    clarifyHistory: [{ question: "¿Es un mapa?", answer: "Sí, un mapa." }],
+  });
+  assert.match(contents[0].parts[1].text, /ACLARAR/);
+  assert.match(contents[0].parts[1].text, /\(poco claro\)/);
+  assert.equal(contents[1].parts[0].text, "ACLARAR:\n¿Es un mapa?");
+  assert.match(contents[2].parts[0].text, /Sí, un mapa/);
+  assert.match(contents[2].parts[0].text, /ACLARAR:/);
+  assert.match(contents[2].parts[0].text, /\(poco claro\)/);
+});
+
+test("a draft plus CLARIFY is sent back so Gemini can finish the batch", () => {
+  const contents = buildTranscribeContents({
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    clarifyHistory: [
+      {
+        question: "Is this a map?",
+        answer: "Yes, a map of Virginia.",
+        draft: "Lesson title\nDirections: Circle the noun.",
+      },
+    ],
+  });
+  assert.equal(contents[1].role, "model");
+  assert.match(contents[1].parts[0].text, /^Lesson title/);
+  assert.match(contents[1].parts[0].text, /CLARIFY:\nIs this a map\?/);
+  assert.match(contents[2].parts[0].text, /Yes, a map of Virginia/);
+  assert.match(contents[2].parts[0].text, /draft appears above/i);
+});
+
+test("multiple clarify turns keep the same PDF and later Q&A", () => {
+  const contents = buildTranscribeContents({
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    clarifyHistory: [
+      { question: "Is the figure a pie chart?", answer: "Yes, a pie chart." },
+      { question: "Is the printed total 24 or 42?", answer: "24." },
+    ],
+  });
+  assert.equal(contents.length, 5);
+  assert.equal(contents[0].parts[0].inline_data.mime_type, "application/pdf");
+  assert.equal(contents[3].role, "model");
+  assert.equal(contents[3].parts[0].text, "CLARIFY:\nIs the printed total 24 or 42?");
+  assert.match(contents[4].parts[0].text, /^24\./);
+});
+
 test("transcribeBatch returns a CLARIFY block for the UI to parse", async () => {
   const markdown = await transcribeBatch({
     apiKey: "test-key",
@@ -308,6 +385,27 @@ test("transcribeBatch returns a CLARIFY block for the UI to parse", async () => 
   });
   assert.equal(markdown, "CLARIFY:\nIs the figure a pie chart?");
   assert.equal(parseClarify(markdown), "Is the figure a pie chart?");
+});
+
+test("transcribeBatch draft plus CLARIFY is still parsed as a question", async () => {
+  const markdown = await transcribeBatch({
+    apiKey: "test-key",
+    startPage: 1,
+    endPage: 5,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    fetchImpl: async () =>
+      jsonResponse(200, {
+        candidates: [
+          {
+            content: {
+              parts: [{ text: "Lesson title\n\nCLARIFY:\nIs this a map?" }],
+            },
+          },
+        ],
+      }),
+  });
+  assert.equal(markdown, "Lesson title\n\nCLARIFY:\nIs this a map?");
+  assert.equal(parseClarify(markdown), "Is this a map?");
 });
 
 test("empty Gemini text throws the dedicated blank-batch message", async () => {

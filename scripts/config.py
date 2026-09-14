@@ -23,7 +23,7 @@ MAX_SUBAGENTS_PER_TURN = 3
 
 INTERPRETATION_PROMPT = """Produce screen-reader-accessible text from these scanned textbook pages. Do not output braille, contractions, or braille ASCII.
 
-Follow all rules in .cursor/rules/accessible-document-style.mdc. Transcribe faithfully. If you cannot reliably make the content accessible, return only a CLARIFY block. Nested lists are allowed. Number or letter questions when they sit under a numbered item. Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. Avoid square brackets, braces, asterisk, and number-sign unless they appear in the source. Do not use markdown hash headings. Use (unclear) for unreadable words. Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
+Follow all rules in .cursor/rules/accessible-document-style.mdc. Transcribe faithfully. If you cannot reliably make the content accessible, end with a CLARIFY block. Prefer a CLARIFY-only reply. Nested lists are allowed. Number or letter questions when they sit under a numbered item. Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. Avoid square brackets, braces, asterisk, and number-sign unless they appear in the source. Do not use markdown hash headings. Use (unclear) for unreadable words. Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
 
 Represent math in plain text only (plus, minus, times, divided by, equals, spoken-friendly fractions). Do not use LaTeX.
 

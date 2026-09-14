@@ -30,7 +30,7 @@ python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --model gemi
 python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --latex-math
 ```
 
-The CLI cannot answer clarification questions. If a batch returns `CLARIFY:`, that batch fails and prints the question; use the web adapter to continue the conversation.
+The CLI cannot answer clarification questions. If a batch ends with a `CLARIFY:` block, even after a draft transcription, that batch fails and prints the question; use the web adapter to continue the conversation.
 
 The page vendors [pdf-lib](https://github.com/Hopding/pdf-lib), [pdf.js](https://github.com/mozilla/pdf.js), and [JSZip](https://github.com/Stuk/jszip) in `docs/vendor/`.
 

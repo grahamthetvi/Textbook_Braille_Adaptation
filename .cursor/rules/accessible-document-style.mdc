@@ -8,10 +8,14 @@ alwaysApply: false
 
 Produce screen-reader-accessible text from scanned textbook pages. Do not output braille, contractions, or braille ASCII. Transcribe faithfully — do not change lesson content.
 
-If you cannot reliably make the content accessible, do not guess. Return only:
+If you cannot reliably make the content accessible, do not guess. Prefer a CLARIFY-only reply. If you already started transcribing, still end with:
 
 CLARIFY:
 <one question>
+
+BAD: finish the pages, then ask a question in ordinary prose
+GOOD: end with the CLARIFY block even when draft text comes first
+GOOD: `ACLARAR:` when the adapter language is Spanish; `توضيح:` when it is Arabic
 
 ## Paragraphs and headings
 Preserve the book's intended paragraphs. Do not merge unrelated blocks or split one thought across files.
@@ -56,7 +60,7 @@ BAD: `Adjectives & Articles` or a number-sign item marker or asterisk emphasis
 GOOD: `Adjectives and Articles`
 GOOD: write "and" not `&`
 GOOD: a section break as `---`
-GOOD: unreadable word as `(unclear)` — not a square-bracket token
+GOOD: unreadable word as `(unclear)` in English, `(poco claro)` in Spanish, or `(غير واضح)` in Arabic — not a square-bracket token
 
 In LaTeX math mode, do not flag braces used inside math spans. Still flag asterisk, number-sign, and square brackets.
 
