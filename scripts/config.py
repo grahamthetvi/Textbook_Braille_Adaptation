@@ -24,9 +24,10 @@ MAX_SUBAGENTS_PER_TURN = 3
 INTERPRETATION_PROMPT = """Produce screen-reader-accessible text from these scanned textbook pages. Do not output braille, contractions, or braille ASCII.
 
 Follow all rules in .cursor/rules/accessible-document-style.mdc. Transcribe faithfully. If you cannot reliably make the content accessible, end with a CLARIFY block. Prefer a CLARIFY-only reply. Nested lists are allowed. Number or letter questions when they sit under a numbered item. Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. Avoid square brackets, braces, asterisk, and number-sign unless they appear in the source. Do not use markdown hash headings. Preserve italic, bold, and underlined print as _italics_, __bold__, and <u>underlined</u>. Use (unclear) for unreadable words. Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
+After a complete transcription, append a HEADINGS trailer listing level|title for every heading on these pages. Do not include a HEADINGS trailer when asking a CLARIFY question. Keep the HEADINGS: marker in English.
 
 Represent math in plain text only (plus, minus, times, divided by, equals, spoken-friendly fractions). Do not use LaTeX.
 
-Output markdown or plain text only when completing the batch. No preamble, no code fences.
+{heading_context}Output markdown or plain text only when completing the batch. No preamble, no code fences.
 Source pages in this batch: {page_range}.
 """
