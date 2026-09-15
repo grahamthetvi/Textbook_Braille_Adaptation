@@ -2,6 +2,7 @@
 
 import { batchFileStem } from "./batches.js";
 import { buildDocxFiles } from "./docx.js";
+import { headingMapFromBatches } from "./headings.js";
 import { t } from "./i18n.js";
 
 function requireJsZip() {
@@ -44,7 +45,10 @@ export async function downloadDocx(results, sourceName) {
   const JSZip = requireJsZip();
   const stem = sourceName.replace(/\.pdf$/i, "") || "textbook";
   const zip = new JSZip();
-  const files = buildDocxFiles(combinedMarkdown(results, sourceName));
+  const files = buildDocxFiles(
+    combinedMarkdown(results, sourceName),
+    headingMapFromBatches(results)
+  );
   for (const [path, content] of Object.entries(files)) {
     zip.file(path, content);
   }

@@ -26,6 +26,26 @@ BAD: a leading number-sign heading when the book uses a plain label
 GOOD: a title-case or all-caps heading that matches the book, then body text
 GOOD: `Tip:` `Note:` `FYI:` `Directions:` `Examples` `Caption:` on their own lines when the book prints them that way
 
+After a complete transcription, append a `HEADINGS:` trailer. Do not include it when asking a CLARIFY question. Levels 1-6. Pipe delimiter. Title text must exactly match a plain title line in the body.
+
+Typical levels: 1 module or major unit; 2 lesson, exercise, or `MODULE REVIEW`; 3 labeled subsection such as `A.` `Tip:` `Note:` `Directions:`; 4+ only when the book clearly nests further. Reuse the same level for a title already used in earlier batches.
+
+BAD: markdown hash headings, or a HEADINGS trailer mixed with a CLARIFY block
+BAD: a trailer title that does not appear as its own line in the body
+GOOD:
+
+```
+MODULE 2: PARTS OF SPEECH
+
+NOUNS
+
+HEADINGS:
+1|MODULE 2: PARTS OF SPEECH
+2|NOUNS
+```
+
+The adapter strips the trailer before saving markdown and uses it for Word heading styles and later batches.
+
 ## Emphasis
 Keep italic, bold, and underlined print from the source. Use underscore markdown and an underline tag so emphasis does not need asterisk.
 

@@ -19,6 +19,13 @@ import {
 import { listOllamaModels } from "./ollama.js";
 import { parseClarifyResponse } from "./prompt.js";
 import { validateMarkdown } from "./validate.js";
+import {
+  formatHeadingContext,
+  headingMapFromBatches,
+  headingMismatchWarnings,
+  missingHeadingsWarning,
+  parseHeadingsResponse,
+} from "./headings.js";
 import { downloadCombined, downloadDocx, downloadZip } from "./download.js";
 import { planBatches, padPage } from "./batches.js";
 import { applyTranscriptionError, formatPageRange, formatRetryingStatus } from "./run-control.js";
@@ -62,6 +69,7 @@ const state = {
   pageCount: 0,
   sourceBytes: null,
   batches: [],
+  headingMap: [],
   running: false,
   abortController: null,
   dragDepth: 0,
@@ -211,6 +219,21 @@ function refreshAlert() {
 
 function completedBatches() {
   return state.batches.filter((batch) => batch.status === "done" && batch.markdown);
+}
+
+function syncHeadingMap() {
+  state.headingMap = headingMapFromBatches(state.batches);
+}
+
+function batchIssuesFromTranscription(body, headings, hasTrailer, pageRange, latexMath) {
+  const label = `pages-${pageRange}`;
+  const issues = validateMarkdown(body, label, { latexMath });
+  issues.push(...headingMismatchWarnings(body, headings, label));
+  const missing = missingHeadingsWarning(hasTrailer, body, label);
+  if (missing) {
+    issues.push(missing);
+  }
+  return issues;
 }
 
 function populateModelSelect() {
@@ -690,6 +713,7 @@ function renderBlankReview() {
 function pauseForBlankReview(batch, pageRange) {
   batch.markdown = "";
   batch.issues = [];
+  batch.headings = [];
   batch.status = "blank";
   batch.error = "";
   batch.clarifyQuestion = "";
@@ -759,7 +783,9 @@ function resetBatchesFromRanges(ranges) {
     locale: "",
     skippedBlank: false,
     emptyRetry: false,
+    headings: [],
   }));
+  syncHeadingMap();
 }
 
 function planFromLoadedPdf() {
@@ -799,6 +825,7 @@ async function loadPdfFile(file) {
     if (!state.pageCount) {
       setAlert("alert.noPages");
       state.batches = [];
+      syncHeadingMap();
       render();
       return;
     }
@@ -835,8 +862,10 @@ function mergeSplitBatches(split) {
       locale: previous?.locale || "",
       skippedBlank: Boolean(previous?.skippedBlank),
       emptyRetry: Boolean(previous?.emptyRetry),
+      headings: previous?.headings || [],
     };
   });
+  syncHeadingMap();
 }
 
 async function ensureBatchBytes() {
@@ -952,6 +981,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
             locale: batch.locale || getLocale(),
             clarifyHistory: batch.clarifyHistory || [],
             emptyRetry: Boolean(batch.emptyRetry),
+            headingContext: formatHeadingContext(headingMapFromBatches(state.batches)),
             onRetry({ waitMs, httpStatus }) {
               batch.status = "retrying";
               batch.error = "";
@@ -968,6 +998,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
           if (parsedClarify) {
             batch.markdown = "";
             batch.issues = [];
+            batch.headings = [];
             batch.clarifyQuestion = parsedClarify.question;
             batch.clarifyDraft = parsedClarify.draft;
             batch.clarifyMarker = parsedClarify.marker || "";
@@ -982,14 +1013,23 @@ async function runAdaptation({ retryOnly = null } = {}) {
             pauseForBlankReview(batch, pageRange);
             return;
           }
-          batch.markdown = markdown;
-          batch.issues = validateMarkdown(markdown, `pages-${pageRange}`, { latexMath });
+          const parsedHeadings = parseHeadingsResponse(markdown);
+          batch.markdown = parsedHeadings.body;
+          batch.headings = parsedHeadings.headings;
+          batch.issues = batchIssuesFromTranscription(
+            parsedHeadings.body,
+            parsedHeadings.headings,
+            parsedHeadings.hasTrailer,
+            pageRange,
+            latexMath
+          );
           batch.status = "done";
           batch.error = "";
           batch.clarifyQuestion = "";
           batch.clarifyDraft = "";
           batch.clarifyMarker = "";
           batch.skippedBlank = false;
+          syncHeadingMap();
           break;
         } catch (err) {
           if (isBlankBatchError(err)) {
@@ -1077,10 +1117,12 @@ function skipBlankBatch() {
   const pageRange = formatPageRange(batch.startPage, batch.endPage);
   const latexMath = Boolean(els.latexMath.checked);
   batch.markdown = skippedBlankMarkdown(batch.startPage, batch.endPage);
+  batch.headings = [];
   batch.issues = validateMarkdown(batch.markdown, `pages-${pageRange}`, { latexMath });
   batch.status = "done";
   batch.error = "";
   batch.skippedBlank = true;
+  syncHeadingMap();
   hideBlankReview();
   setAlert("");
   const pending = state.batches.some((item) => item.status === "pending");

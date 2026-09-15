@@ -19,6 +19,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from config import ACCESSIBLE_DIR
+from headings import format_heading_context, merge_heading_map, parse_headings_response
 from split_pdf import split_pdf
 
 DEFAULT_MODEL = "gemini-3.8-flash"
@@ -40,6 +41,10 @@ Formatting
 Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines.
 Nested and indented lists are allowed. Number or letter questions when they sit under a numbered item.
 Avoid square brackets, braces, asterisk, and number-sign unless those characters appear in the source. Do not use markdown hash headings. Write headings as plain title lines matching the book's hierarchy. Preserve italic, bold, and underlined print as _italics_, __bold__, and <u>underlined</u>. Do not use asterisk for emphasis. Do not add emphasis the book does not print.
+After a complete transcription, append a HEADINGS trailer. Do not include a HEADINGS trailer when asking a CLARIFY question. Levels 1-6 only. Pipe delimiter. Title text must exactly match a plain title line in the body after trimming. List every heading on these pages. Reuse the same level for a title already used in earlier batches. Typical levels: 1 module or major unit; 2 lesson, exercise, or MODULE REVIEW; 3 labeled subsection such as A. Tip: Note: Directions:; 4+ only when the book clearly nests further.
+HEADINGS:
+1|MODULE 2: PARTS OF SPEECH
+2|NOUNS
 Default math: plain text only. Write plus, minus, times, divided by, equals, and spoken-friendly fractions. Do not use LaTeX unless math-LaTeX mode is on.
 Use simple markdown pipe tables when the book shows tabular data. Do not insert a header-separator row of hyphens; three hyphens on their own line are a section break, not a table rule.
 Use labels such as Tip: Note: FYI: Directions: Examples Caption: on their own lines when the book prints them that way.
@@ -73,8 +78,15 @@ def build_style_rules(latex_math: bool = False) -> str:
     return f"{STYLE_REMINDER}\n{LATEX_MATH_INSTRUCTION}\n"
 
 
-def build_interpretation_prompt(page_range: str, *, latex_math: bool = False) -> str:
+def build_interpretation_prompt(
+    page_range: str,
+    *,
+    latex_math: bool = False,
+    heading_context: str = "",
+) -> str:
     math_line = LATEX_MATH_INSTRUCTION if latex_math else PLAIN_MATH_INSTRUCTION
+    context = (heading_context or "").strip()
+    heading_block = f"\n{context}\n" if context else ""
     return (
         "Produce screen-reader-accessible text from these scanned textbook pages. "
         "Do not output braille, contractions, or braille ASCII.\n"
@@ -89,9 +101,12 @@ def build_interpretation_prompt(page_range: str, *, latex_math: bool = False) ->
         "underlined print as _italics_, __bold__, and <u>underlined</u>. Use (unclear) for unreadable "
         "words. Strip running headers, footers, and lone page numbers. Rejoin "
         "line-break hyphens. Read columns in order.\n"
+        "After a complete transcription, append a HEADINGS trailer listing "
+        "level|title for every heading on these pages. Do not include a HEADINGS "
+        "trailer when asking a CLARIFY question. Keep the HEADINGS: marker in English.\n"
         "\n"
         f"{math_line}\n"
-        "\n"
+        f"{heading_block}"
         "Output markdown or plain text only when completing the batch. No preamble, no "
         "code fences.\n"
         f"Source pages in this batch: {page_range}."
@@ -222,11 +237,14 @@ def transcribe_pdf_bytes(
     max_retries: int = RETRYABLE_MAX_RETRIES,
     *,
     latex_math: bool = False,
+    heading_context: str = "",
     sleep_fn=time.sleep,
     on_retry=None,
     urlopen_fn=None,
 ) -> str:
-    prompt = build_interpretation_prompt(page_range, latex_math=latex_math)
+    prompt = build_interpretation_prompt(
+        page_range, latex_math=latex_math, heading_context=heading_context
+    )
     body = {
         "system_instruction": {"parts": [{"text": build_style_rules(latex_math)}]},
         "contents": [
@@ -364,27 +382,40 @@ def run_transcriptions(
         def err_log(message: str) -> None:
             print(message, file=sys.stderr, flush=True)
 
-    if transcribe_fn is None:
-
-        def transcribe_fn(pdf_bytes, page_range, key, model):
-            def on_retry(info):
-                log(f"  {info['message']}")
-
-            return transcribe_pdf_bytes(
-                pdf_bytes,
-                page_range,
-                key,
-                model,
-                latex_math=latex_math,
-                on_retry=on_retry,
-            )
-
     transcribed = 0
     skipped = 0
+    heading_map: list[dict] = []
+
+    def default_transcribe(pdf_bytes, page_range, key, model):
+        def on_retry(info):
+            log(f"  {info['message']}")
+
+        return transcribe_pdf_bytes(
+            pdf_bytes,
+            page_range,
+            key,
+            model,
+            latex_math=latex_math,
+            heading_context=format_heading_context(heading_map),
+            on_retry=on_retry,
+        )
+
+    if transcribe_fn is None:
+        transcribe_fn = default_transcribe
+
     for batch in batches:
         label = _page_range(batch.start_page, batch.end_page)
         out_path = out_dir / f"{batch.output_stem}.md"
         if skip_existing and out_path.exists():
+            parsed_existing = parse_headings_response(out_path.read_text(encoding="utf-8"))
+            if parsed_existing["has_trailer"]:
+                out_path.write_text(parsed_existing["body"].rstrip() + "\n", encoding="utf-8")
+            heading_map = merge_heading_map(
+                heading_map,
+                batch.start_page,
+                batch.end_page,
+                parsed_existing["headings"],
+            )
             log(f"Skipping {label} (already at {out_path})")
             skipped += 1
             continue
@@ -397,7 +428,14 @@ def run_transcriptions(
         except Exception as err:
             err_log(format_stopped_batch_error(label, str(err)))
             return 1
-        out_path.write_text(text.rstrip() + "\n", encoding="utf-8")
+        parsed = parse_headings_response(text)
+        out_path.write_text(parsed["body"].rstrip() + "\n", encoding="utf-8")
+        heading_map = merge_heading_map(
+            heading_map,
+            batch.start_page,
+            batch.end_page,
+            parsed["headings"],
+        )
         transcribed += 1
         log(f"  wrote {out_path}")
     log(f"Done: {transcribed} new file(s), {skipped} skipped, in {out_dir}")

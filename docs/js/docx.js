@@ -1,5 +1,7 @@
 /** Build a minimal Word .docx (OOXML) from accessible markdown. */
 
+import { headingLevelForLine } from "./headings.js";
+
 const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -34,6 +36,30 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
       <w:sz w:val="24"/>
     </w:rPr>
   </w:style>
+  ${[1, 2, 3, 4, 5, 6]
+    .map((level) => {
+      const size = [32, 28, 26, 24, 22, 20][level - 1];
+      const before = [240, 200, 160, 160, 120, 120][level - 1];
+      return `<w:style w:type="paragraph" w:styleId="Heading${level}">
+    <w:name w:val="heading ${level}"/>
+    <w:basedOn w:val="Normal"/>
+    <w:next w:val="Normal"/>
+    <w:uiPriority w:val="9"/>
+    <w:qFormat/>
+    <w:pPr>
+      <w:keepNext/>
+      <w:keepLines/>
+      <w:spacing w:before="${before}" w:after="80"/>
+      <w:outlineLvl w:val="${level - 1}"/>
+    </w:pPr>
+    <w:rPr>
+      <w:b/>
+      <w:sz w:val="${size}"/>
+      <w:szCs w:val="${size}"/>
+    </w:rPr>
+  </w:style>`;
+    })
+    .join("\n  ")}
 </w:styles>
 `;
 
@@ -164,11 +190,12 @@ function runXml(run) {
   return `<w:r>${props}<w:t xml:space="preserve">${escapeXml(run.text)}</w:t></w:r>`;
 }
 
-function paragraphXml(text) {
+function paragraphXml(text, styleId = "") {
   if (!text) {
     return "<w:p/>";
   }
-  return `<w:p>${parseInlineRuns(text).map(runXml).join("")}</w:p>`;
+  const style = styleId ? `<w:pPr><w:pStyle w:val="${styleId}"/></w:pPr>` : "";
+  return `<w:p>${style}${parseInlineRuns(text).map(runXml).join("")}</w:p>`;
 }
 
 const PAGE_BREAK = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
@@ -269,7 +296,7 @@ function tableXml(rowLines) {
   )}</w:tblBorders><w:tblLook w:val="04A0" w:firstRow="1" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="0" w:noVBand="1"/></w:tblPr><w:tblGrid>${grid}</w:tblGrid>${headerRow}${bodyRows}</w:tbl>`;
 }
 
-export function markdownToDocumentXml(markdown) {
+export function markdownToDocumentXml(markdown, headingMap = []) {
   const lines = String(markdown || "")
     .replace(/\r\n/g, "\n")
     .replace(/\n$/, "")
@@ -292,7 +319,9 @@ export function markdownToDocumentXml(markdown) {
       parts.push(tableXml(lines.slice(start, i)));
       continue;
     }
-    parts.push(paragraphXml(line));
+    const headingLevel = headingLevelForLine(line, headingMap);
+    const styleId = headingLevel ? `Heading${headingLevel}` : "";
+    parts.push(paragraphXml(line, styleId));
     i += 1;
   }
   const body = parts.join("");
@@ -309,12 +338,12 @@ export function markdownToDocumentXml(markdown) {
 `;
 }
 
-export function buildDocxFiles(markdown) {
+export function buildDocxFiles(markdown, headingMap = []) {
   return {
     "[Content_Types].xml": CONTENT_TYPES,
     "_rels/.rels": ROOT_RELS,
     "word/_rels/document.xml.rels": DOCUMENT_RELS,
     "word/styles.xml": STYLES,
-    "word/document.xml": markdownToDocumentXml(markdown),
+    "word/document.xml": markdownToDocumentXml(markdown, headingMap),
   };
 }

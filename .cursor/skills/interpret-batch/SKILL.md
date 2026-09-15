@@ -20,12 +20,13 @@ Use this skill only when the user asks to process pending `scans/` batches insid
 
 1. Read `spawn.tasks[0]` from `python3 scripts/run_pipeline.py --manifest --batches 1 --spawn-prompt`.
 2. Run as a same-VM worker with model from task `model` (`gemini-3.8-flash-medium`).
-3. Read the batch PDF and write `accessible/*.md`.
+3. Read the batch PDF and write `accessible/*.md`, including a `HEADINGS:` trailer (`level|title`).
 4. After finishing:
    ```bash
    python3 scripts/run_pipeline.py --sync-state
    python3 scripts/validate_accessible.py <output-path>
    ```
+   `--sync-state` strips the trailer and stores heading levels for later batches.
 
 ## Do not
 

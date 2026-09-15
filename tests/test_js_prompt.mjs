@@ -21,6 +21,8 @@ test("STYLE_RULES is screen-reader agent copy, not Grade 2 as the primary goal",
   assert.match(STYLE_RULES, /Nested and indented lists are allowed/);
   assert.match(STYLE_RULES, /\(unclear\)/);
   assert.match(STYLE_RULES, /Do not return an empty reply when printed lesson text is visible/);
+  assert.match(STYLE_RULES, /HEADINGS:/);
+  assert.match(STYLE_RULES, /1\|MODULE 2: PARTS OF SPEECH/);
   assert.match(STYLE_RULES, /_italics_/);
   assert.match(STYLE_RULES, /__bold__/);
   assert.match(STYLE_RULES, /<u>underlined<\/u>/);
@@ -35,6 +37,7 @@ test("buildInterpretationPrompt mentions screen reader and nested lists", () => 
   assert.match(prompt, /CLARIFY/);
   assert.match(prompt, /Nested lists are allowed/);
   assert.match(prompt, /\(unclear\)/);
+  assert.match(prompt, /HEADINGS trailer/);
   assert.match(prompt, /001-005/);
   assert.doesNotMatch(prompt, /Retry after empty output/);
   assert.equal(prompt.includes(PLAIN_MATH_INSTRUCTION), true);
@@ -76,6 +79,15 @@ test("Spanish and Arabic UI locales ask Gemini to write questions with localized
   assert.match(formatClarifyFollowUp("Sí, un mapa.", { locale: "es" }), /ACLARAR:/);
   assert.match(formatClarifyFollowUp("Sí, un mapa.", { locale: "es" }), /\(poco claro\)/);
   assert.doesNotMatch(formatClarifyFollowUp("Yes."), /ACLARAR:/);
+});
+
+test("heading context from earlier batches is injected into the user prompt", () => {
+  const context =
+    "Heading context from earlier batches (continue this hierarchy; match levels for the same titles):\nH1 MODULE 1: THE SENTENCE";
+  const prompt = buildInterpretationPrompt("006-010", { headingContext: context });
+  assert.match(prompt, /H1 MODULE 1: THE SENTENCE/);
+  assert.match(prompt, /HEADINGS trailer/);
+  assert.doesNotMatch(buildInterpretationPrompt("006-010"), /H1 MODULE 1: THE SENTENCE/);
 });
 
 test("empty-output retry tells Gemini a reviewer confirmed printed text", () => {

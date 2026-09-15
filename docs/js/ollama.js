@@ -62,13 +62,14 @@ export function buildChatMessages({
   clarifyHistory = [],
   locale = "en",
   emptyRetry = false,
+  headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
   const messages = [
     { role: "system", content: buildStyleRules(latexMath, { locale }) },
     {
       role: "user",
-      content: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry }),
+      content: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }),
       images,
     },
   ];
@@ -148,6 +149,7 @@ async function chatOnce({
   clarifyHistory,
   locale,
   emptyRetry,
+  headingContext,
 }) {
   const body = {
     model,
@@ -161,6 +163,7 @@ async function chatOnce({
       clarifyHistory,
       locale,
       emptyRetry,
+      headingContext,
     }),
   };
 
@@ -204,6 +207,7 @@ export async function transcribeBatch({
   clarifyHistory = [],
   locale = "en",
   emptyRetry = false,
+  headingContext = "",
   rasterizePages = renderPdfPagesToPngBase64,
 }) {
   const images = await rasterizePages(pdfBytes, { scale: 2 });
@@ -228,6 +232,7 @@ export async function transcribeBatch({
       clarifyHistory,
       locale,
       emptyRetry,
+      headingContext,
     });
   } catch (err) {
     if (!shouldFallbackToPerPage(err, images.length)) {
@@ -254,6 +259,7 @@ export async function transcribeBatch({
       clarifyHistory,
       locale,
       emptyRetry,
+      headingContext,
     });
     parts.push(text);
   }

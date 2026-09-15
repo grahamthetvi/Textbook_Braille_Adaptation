@@ -20,11 +20,37 @@ test("escapeXml encodes characters that would break OOXML", () => {
   assert.equal(escapeXml("A & B <C>"), "A &amp; B &lt;C&gt;");
 });
 
-test("markdownToDocumentXml writes each line as a paragraph", () => {
-  const xml = markdownToDocumentXml("Title\n\nTip: Read this.");
-  assert.match(xml, /<w:t xml:space="preserve">Title<\/w:t>/);
-  assert.match(xml, /<w:t xml:space="preserve">Tip: Read this\.<\/w:t>/);
-  assert.match(xml, /<w:p\/>/);
+test("registered titles become Word heading styles", () => {
+  const xml = markdownToDocumentXml(
+    "MODULE 2: PARTS OF SPEECH\n\nNOUNS\nA noun is a word.",
+    [
+      { level: 1, title: "MODULE 2: PARTS OF SPEECH" },
+      { level: 2, title: "NOUNS" },
+    ]
+  );
+  assert.match(xml, /<w:pStyle w:val="Heading1"\/>/);
+  assert.match(xml, /<w:pStyle w:val="Heading2"\/>/);
+  assert.match(xml, />MODULE 2: PARTS OF SPEECH</);
+  assert.match(xml, />NOUNS</);
+  assert.match(
+    xml,
+    /<w:p><w:r><w:t xml:space="preserve">A noun is a word\.<\/w:t><\/w:r><\/w:p>/
+  );
+});
+
+test("heading paragraphs keep italic, bold, and underline", () => {
+  const xml = markdownToDocumentXml("_Lesson_", [{ level: 2, title: "Lesson" }]);
+  assert.match(xml, /<w:pStyle w:val="Heading2"\/>/);
+  assert.match(xml, /<w:i\/>/);
+  assert.match(xml, />Lesson</);
+});
+
+test("styles.xml defines Heading1 through Heading6", () => {
+  const files = buildDocxFiles("Lesson title", [{ level: 1, title: "Lesson title" }]);
+  assert.match(files["word/styles.xml"], /w:styleId="Heading1"/);
+  assert.match(files["word/styles.xml"], /w:styleId="Heading6"/);
+  assert.match(files["word/styles.xml"], /<w:name w:val="heading 1"\/>/);
+  assert.match(files["word/document.xml"], /<w:pStyle w:val="Heading1"\/>/);
 });
 
 test("parseInlineRuns keeps italic, bold, and underline", () => {

@@ -17,6 +17,10 @@ Formatting
 Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines.
 Nested and indented lists are allowed. Number or letter questions when they sit under a numbered item.
 Avoid square brackets, braces, asterisk, and number-sign unless those characters appear in the source. Do not use markdown hash headings. Write headings as plain title lines matching the book's hierarchy. Preserve italic, bold, and underlined print as _italics_, __bold__, and <u>underlined</u>. Do not use asterisk for emphasis. Do not add emphasis the book does not print.
+After a complete transcription, append a HEADINGS trailer. Do not include a HEADINGS trailer when asking a CLARIFY question. Levels 1-6 only. Pipe delimiter. Title text must exactly match a plain title line in the body after trimming. List every heading on these pages. Reuse the same level for a title already used in earlier batches. Typical levels: 1 module or major unit; 2 lesson, exercise, or MODULE REVIEW; 3 labeled subsection such as A. Tip: Note: Directions:; 4+ only when the book clearly nests further.
+HEADINGS:
+1|MODULE 2: PARTS OF SPEECH
+2|NOUNS
 Default math: plain text only. Write plus, minus, times, divided by, equals, and spoken-friendly fractions. Do not use LaTeX unless math-LaTeX mode is on.
 Use simple markdown pipe tables when the book shows tabular data. Do not insert a header-separator row of hyphens; three hyphens on their own line are a section break, not a table rule.
 Use labels such as Tip: Note: FYI: Directions: Examples Caption: on their own lines when the book prints them that way.
@@ -143,11 +147,13 @@ export function buildInterpretationPrompt(pageRange, options = {}) {
   const emptyRetry = Boolean(options.emptyRetry)
     ? `\n${formatEmptyRetryInstruction(options)}\n`
     : "";
+  const headingContext = String(options.headingContext || "").trim();
+  const headingBlock = headingContext ? `\n${headingContext}\n` : "";
   return `Produce screen-reader-accessible text from these scanned textbook pages. Do not output braille, contractions, or braille ASCII.
 
 Follow the system instruction. Transcribe faithfully. If you cannot reliably make the content accessible, end with a ${lang.clarifyMarker} block. Prefer a ${lang.clarifyMarker}-only reply. Nested lists are allowed. Number or letter questions when they sit under a numbered item. Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. Avoid square brackets, braces, asterisk, and number-sign unless they appear in the source. Do not use markdown hash headings. Preserve italic, bold, and underlined print as _italics_, __bold__, and <u>underlined</u>. Use ${lang.unclearToken} for unreadable words. Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
-${languageBlock}${mathLine}
-
+After a complete transcription, append a HEADINGS trailer listing level|title for every heading on these pages. Do not include a HEADINGS trailer when asking a ${lang.clarifyMarker} question. Keep the HEADINGS: marker in English.
+${languageBlock}${mathLine}${headingBlock}
 Output markdown or plain text only when completing the batch. No preamble, no code fences.
 Source pages in this batch: ${pageRange}.${emptyRetry}`;
 }

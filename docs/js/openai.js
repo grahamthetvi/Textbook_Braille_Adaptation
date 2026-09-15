@@ -67,6 +67,7 @@ export function buildInput({
   clarifyHistory = [],
   locale = "en",
   emptyRetry = false,
+  headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
   const input = [
@@ -81,7 +82,7 @@ export function buildInput({
         },
         {
           type: "input_text",
-          text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry }),
+          text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }),
         },
       ],
     },
@@ -115,6 +116,7 @@ export function buildRequestBody({
   clarifyHistory = [],
   locale = "en",
   emptyRetry = false,
+  headingContext = "",
 }) {
   return {
     model,
@@ -129,6 +131,7 @@ export function buildRequestBody({
       clarifyHistory,
       locale,
       emptyRetry,
+      headingContext,
     }),
   };
 }
@@ -149,6 +152,7 @@ export async function transcribeBatch({
   clarifyHistory = [],
   locale = "en",
   emptyRetry = false,
+  headingContext = "",
 }) {
   const body = buildRequestBody({
     model,
@@ -160,6 +164,7 @@ export async function transcribeBatch({
     clarifyHistory,
     locale,
     emptyRetry,
+    headingContext,
   });
 
   const payload = await retryingFetchJson({
