@@ -128,6 +128,7 @@ export function buildTranscribeContents({
   clarifyHistory = [],
   locale = "en",
   emptyRetry = false,
+  headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
   const contents = [
@@ -140,7 +141,7 @@ export function buildTranscribeContents({
             data: bytesToBase64(pdfBytes),
           },
         },
-        { text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry }) },
+        { text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }) },
       ],
     },
   ];
@@ -175,6 +176,7 @@ export async function transcribeBatch({
   clarifyHistory = [],
   locale = "en",
   emptyRetry = false,
+  headingContext = "",
 }) {
   const body = {
     system_instruction: {
@@ -188,6 +190,7 @@ export async function transcribeBatch({
       clarifyHistory,
       locale,
       emptyRetry,
+      headingContext,
     }),
     generationConfig: buildGenerationConfig(model, effort),
   };

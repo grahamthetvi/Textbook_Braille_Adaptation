@@ -12,6 +12,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from config import ACCESSIBLE_DIR
+from headings import parse_headings_response
 
 FORBIDDEN_DEFAULT = "#&*[]{}"
 FORBIDDEN_LATEX_MATH = "#&*[]"
@@ -33,7 +34,8 @@ def _check_forbidden_chars(text: str, path: Path, *, latex_math: bool = False) -
 
 def validate_file(path: Path, *, latex_math: bool = False) -> list[str]:
     text = path.read_text(encoding="utf-8")
-    return _check_forbidden_chars(text, path, latex_math=latex_math)
+    parsed = parse_headings_response(text)
+    return _check_forbidden_chars(parsed["body"], path, latex_math=latex_math)
 
 
 def validate_paths(paths: list[Path], *, latex_math: bool = False) -> tuple[list[str], int]:

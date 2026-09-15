@@ -26,6 +26,7 @@ from config import (
     SCANS_DIR,
     STATE_FILE,
 )
+from headings import merge_heading_map, parse_headings_response
 from spawn_prompt import build_spawn_manifest
 from split_pdf import PageBatch, describe_plan, source_sha256, split_pdf
 
@@ -117,8 +118,9 @@ def mark_completed(
     batch: PageBatch,
     output_file: Path,
     unit_prefix: str | None = None,
+    headings: list[dict] | None = None,
 ) -> None:
-    state.setdefault("completed", {})[batch_key(source_pdf, batch, unit_prefix)] = {
+    record = {
         "source_pdf": source_pdf.name,
         "unit_prefix": unit_prefix,
         "start_page": batch.start_page,
@@ -126,6 +128,14 @@ def mark_completed(
         "output_file": str(output_file.relative_to(ACCESSIBLE_DIR.parent)),
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
+    if headings is not None:
+        record["headings"] = headings
+    existing = state.setdefault("completed", {}).get(
+        batch_key(source_pdf, batch, unit_prefix)
+    )
+    if existing and headings is None and existing.get("headings"):
+        record["headings"] = existing["headings"]
+    state.setdefault("completed", {})[batch_key(source_pdf, batch, unit_prefix)] = record
 
 
 def make_batch(source_pdf: Path, start: int, end: int) -> PageBatch:
@@ -150,6 +160,7 @@ def update_source_hash(state: dict, source_pdf: Path) -> list[str]:
             "Consider re-splitting affected batches."
         )
     sources[source_pdf.name] = {
+        **(previous or {}),
         "sha256": digest,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -251,6 +262,43 @@ def planned_batches(
     return entries
 
 
+def ingest_output_headings(out_file: Path) -> list[dict]:
+    """Parse a HEADINGS trailer, strip it from the file, and return heading entries."""
+    parsed = parse_headings_response(out_file.read_text(encoding="utf-8"))
+    if parsed["has_trailer"]:
+        out_file.write_text(parsed["body"].rstrip() + "\n", encoding="utf-8")
+    return parsed["headings"]
+
+
+def rebuild_source_heading_map(state: dict, source_pdf_name: str) -> list[dict]:
+    """Rebuild the running heading map for one source from completed batch records."""
+    records = [
+        rec
+        for rec in state.get("completed", {}).values()
+        if rec.get("source_pdf") == source_pdf_name
+    ]
+    records.sort(key=lambda rec: (rec.get("start_page") or 0, rec.get("end_page") or 0))
+    heading_map: list[dict] = []
+    for rec in records:
+        heading_map = merge_heading_map(
+            heading_map,
+            rec.get("start_page") or 0,
+            rec.get("end_page") or 0,
+            rec.get("headings") or [],
+        )
+    sources = state.setdefault("sources", {})
+    source = sources.setdefault(source_pdf_name, {})
+    source["heading_map"] = heading_map
+    return heading_map
+
+
+def heading_maps_from_state(state: dict) -> dict[str, list[dict]]:
+    maps: dict[str, list[dict]] = {}
+    for name, record in (state.get("sources") or {}).items():
+        maps[name] = record.get("heading_map") or []
+    return maps
+
+
 def sync_state_from_outputs(
     *,
     selected_file: Path | None = None,
@@ -267,9 +315,22 @@ def sync_state_from_outputs(
             batch = make_batch(source_pdf, start, end)
             out_file = output_path(batch, unit_prefix)
             key = batch_key(source_pdf, batch, unit_prefix)
-            if out_file.exists() and key not in state.get("completed", {}):
-                mark_completed(state, source_pdf, batch, out_file, unit_prefix)
+            if not out_file.exists():
+                continue
+            headings = ingest_output_headings(out_file)
+            if key not in state.get("completed", {}):
+                mark_completed(
+                    state,
+                    source_pdf,
+                    batch,
+                    out_file,
+                    unit_prefix,
+                    headings=headings,
+                )
                 synced += 1
+            elif headings:
+                state["completed"][key]["headings"] = headings
+        rebuild_source_heading_map(state, source_pdf.name)
 
     save_state(state)
     return synced
@@ -354,7 +415,7 @@ def build_status(
         "blockers": blockers,
     }
     if spawn_prompt:
-        payload["spawn"] = build_spawn_manifest(pending)
+        payload["spawn"] = build_spawn_manifest(pending, heading_maps_from_state(state))
     return payload
 
 

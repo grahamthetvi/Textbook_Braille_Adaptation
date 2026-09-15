@@ -414,6 +414,18 @@ test("multiple clarify turns keep the same PDF and later Q&A", () => {
   assert.match(contents[4].parts[0].text, /^24\./);
 });
 
+test("heading context is sent on the Gemini user turn", () => {
+  const contents = buildTranscribeContents({
+    startPage: 6,
+    endPage: 10,
+    pdfBytes: new Uint8Array([1, 2, 3, 4]),
+    headingContext:
+      "Heading context from earlier batches (continue this hierarchy; match levels for the same titles):\nH1 MODULE 1: THE SENTENCE",
+  });
+  assert.match(contents[0].parts[1].text, /H1 MODULE 1: THE SENTENCE/);
+  assert.match(contents[0].parts[1].text, /HEADINGS trailer/);
+});
+
 test("empty-output retry adds the confirmed-text instruction to the Gemini request", async () => {
   const firstTry = buildTranscribeContents({
     startPage: 1,

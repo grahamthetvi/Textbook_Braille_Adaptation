@@ -144,7 +144,7 @@ Accessible files follow `.cursor/rules/accessible-document-style.mdc`:
 
 - Preserve paragraphs and lesson content for screen readers.
 - Use headings, lists (including nested lists), and tables. Number or letter questions under a numbered item.
-- Keep italic, bold, and underlined print as `_italics_`, `__bold__`, and `<u>underlined</u>`. Headings are plain title lines, not `#` markdown.
+- Keep italic, bold, and underlined print as `_italics_`, `__bold__`, and `<u>underlined</u>`. Headings are plain title lines, not `#` markdown. The model also appends a `HEADINGS:` trailer (`level|title`) that the adapter strips, then uses for Word Heading 1–6 styles and later batches.
 - Format multi-digit numbers with commas when helpful; dates and phones with hyphens.
 - Add transcriber notes only when a visual cannot be converted accessibly.
 - Avoid `[]`, `{}`, `#`, `&`, and `*` unless they appear in the source. In LaTeX math mode, braces inside math spans are allowed.

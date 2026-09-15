@@ -82,6 +82,8 @@ class AdaptPdfPromptTests(unittest.TestCase):
         self.assertIn("(unclear)", STYLE_REMINDER)
         self.assertIn("Do not return an empty reply when printed lesson text is visible", STYLE_REMINDER)
         self.assertIn("_italics_", STYLE_REMINDER)
+        self.assertIn("HEADINGS:", STYLE_REMINDER)
+        self.assertIn("1|MODULE 2: PARTS OF SPEECH", STYLE_REMINDER)
         self.assertIn("__bold__", STYLE_REMINDER)
         self.assertIn("<u>underlined</u>", STYLE_REMINDER)
         self.assertNotIn("later Grade 2 braille", STYLE_REMINDER)
@@ -94,6 +96,7 @@ class AdaptPdfPromptTests(unittest.TestCase):
         self.assertIn("CLARIFY", prompt)
         self.assertIn("Nested lists are allowed", prompt)
         self.assertIn(PLAIN_MATH_INSTRUCTION, prompt)
+        self.assertIn("HEADINGS trailer", prompt)
         self.assertNotIn(LATEX_MATH_INSTRUCTION, prompt)
         self.assertNotIn("Grade 2 braille translation", prompt)
 
@@ -105,6 +108,16 @@ class AdaptPdfPromptTests(unittest.TestCase):
         self.assertIn("$$...$$", prompt)
         self.assertIn(LATEX_MATH_INSTRUCTION, build_style_rules(True))
         self.assertEqual(build_style_rules(False), STYLE_REMINDER)
+
+    def test_heading_context_is_injected_into_the_user_prompt(self):
+        context = (
+            "Heading context from earlier batches (continue this hierarchy; "
+            "match levels for the same titles):\nH1 MODULE 1: THE SENTENCE"
+        )
+        prompt = build_interpretation_prompt("006-010", heading_context=context)
+        self.assertIn("H1 MODULE 1: THE SENTENCE", prompt)
+        self.assertIn("HEADINGS trailer", prompt)
+        self.assertNotIn("H1 MODULE 1", build_interpretation_prompt("006-010"))
 
     def test_style_constants_lockstep_with_js(self):
         import json
@@ -214,6 +227,40 @@ class AdaptPdfStopOnErrorTests(unittest.TestCase):
             self.assertEqual(len(errors), 1)
             self.assertIn("Batch pages 006-010 failed: RESOURCE_EXHAUSTED: quota exceeded", errors[0])
             self.assertIn(REMAINING_NOT_SENT, errors[0])
+
+    def test_headings_trailer_is_stripped_before_writing(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            out_dir = tmp / "accessible"
+            out_dir.mkdir()
+            source = tmp / "book.pdf"
+            source.write_bytes(b"%PDF-1.4\n")
+            pdf = tmp / "batch-001-005.pdf"
+            pdf.write_bytes(b"%PDF-fake\n")
+            batches = [
+                PageBatch(
+                    source_pdf=source,
+                    start_page=1,
+                    end_page=5,
+                    batch_pdf=pdf,
+                )
+            ]
+
+            def transcribe(pdf_bytes, page_range, key, model):
+                return "MODULE 2: PARTS OF SPEECH\n\nNOUNS\n\nHEADINGS:\n1|MODULE 2: PARTS OF SPEECH\n2|NOUNS\n"
+
+            code = run_transcriptions(
+                batches,
+                key="test-key",
+                model="gemini-3.8-flash",
+                out_dir=out_dir,
+                transcribe_fn=transcribe,
+                log=lambda _message: None,
+            )
+            self.assertEqual(code, 0)
+            written = (out_dir / "pages-001-005.md").read_text(encoding="utf-8")
+            self.assertEqual(written, "MODULE 2: PARTS OF SPEECH\n\nNOUNS\n")
+            self.assertNotIn("HEADINGS:", written)
 
 
 class AdaptPdfRateLimitRetryTests(unittest.TestCase):
