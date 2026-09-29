@@ -18,6 +18,7 @@ import {
 import { DEFAULT_MODEL } from "./models.js";
 import {
   buildInterpretationPrompt,
+  buildOcrCleanupPrompt,
   buildStyleRules,
   formatClarifyFollowUp,
   formatClarifyModelTurn,
@@ -104,7 +105,20 @@ export function emptyOutputError(payload) {
   if (BLANK_FINISH_REASONS.has(reason)) {
     return geminiError(t("gemini.empty"));
   }
-  return geminiError(t("gemini.emptyReason", { reason }));
+  const err = geminiError(t("gemini.emptyReason", { reason }));
+  err.finishReason = reason;
+  return err;
+}
+
+export function isRecitationError(err) {
+  if (!err) {
+    return false;
+  }
+  if (err.finishReason === "RECITATION" || err.recitation === true) {
+    return true;
+  }
+  const msg = String(err.message || "");
+  return /recitation/i.test(msg);
 }
 
 export function describeGeminiError(payload, status, options = {}) {
@@ -135,6 +149,7 @@ export function buildTranscribeContents({
   startPage,
   endPage,
   pdfBytes,
+  ocrText = "",
   latexMath = false,
   clarifyHistory = [],
   locale = "en",
@@ -142,10 +157,9 @@ export function buildTranscribeContents({
   headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
-  const contents = [
-    {
-      role: "user",
-      parts: [
+  const userParts = ocrText
+    ? [{ text: buildOcrCleanupPrompt(pageRange, ocrText, { latexMath, locale, headingContext }) }]
+    : [
         {
           inline_data: {
             mime_type: "application/pdf",
@@ -153,7 +167,11 @@ export function buildTranscribeContents({
           },
         },
         { text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }) },
-      ],
+      ];
+  const contents = [
+    {
+      role: "user",
+      parts: userParts,
     },
   ];
   for (const turn of clarifyHistory || []) {
@@ -177,6 +195,7 @@ export async function transcribeBatch({
   startPage,
   endPage,
   pdfBytes,
+  ocrText = "",
   proxyUrl = "",
   signal,
   maxRetries = RETRYABLE_MAX_RETRIES,
@@ -197,6 +216,7 @@ export async function transcribeBatch({
       startPage,
       endPage,
       pdfBytes,
+      ocrText,
       latexMath,
       clarifyHistory,
       locale,

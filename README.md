@@ -59,7 +59,7 @@ python3 scripts/adapt_pdf.py scans/file.pdf --key "$GEMINI_API_KEY" --latex-math
 
 The CLI cannot answer clarification questions. If a batch ends with a `CLARIFY:` block, even after a draft transcription, that batch fails and prints the question; use the web adapter to continue the conversation.
 
-The page vendors [pdf-lib](https://github.com/Hopding/pdf-lib), [pdf.js](https://github.com/mozilla/pdf.js), and [JSZip](https://github.com/Stuk/jszip) in `docs/vendor/`.
+The page vendors [pdf-lib](https://github.com/Hopding/pdf-lib), [pdf.js](https://github.com/mozilla/pdf.js), [JSZip](https://github.com/Stuk/jszip), and [Tesseract.js](https://github.com/naptha/tesseract.js) in `docs/vendor/`.
 
 ## Web app
 
@@ -82,7 +82,8 @@ https://grahamthetvi.github.io/Textbook_Braille_Adaptation/
 5. Adapt book.
 6. If a clarification panel appears, answer the question and continue that batch.
 7. If a blank-output panel appears, compare the original pages, then skip or retry that batch.
-8. Download a Word document, combined markdown, or a zip of per-batch files.
+8. If an automated model filter flags text as recitation, the adapter automatically extracts the page text in the browser and re-prompts the model to format the extracted OCR text.
+9. Download a Word document, combined markdown, or a zip of per-batch files.
 
 ### Enable GitHub Pages
 

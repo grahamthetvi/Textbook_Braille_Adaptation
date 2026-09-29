@@ -12,6 +12,7 @@ import {
 import { MAX_OUTPUT_TOKENS, normalizeEffort } from "./models.js";
 import {
   buildInterpretationPrompt,
+  buildOcrCleanupPrompt,
   buildStyleRules,
   formatClarifyFollowUp,
   formatClarifyModelTurn,
@@ -53,6 +54,7 @@ export function buildMessages({
   startPage,
   endPage,
   pdfBytes,
+  ocrText = "",
   latexMath = false,
   clarifyHistory = [],
   locale = "en",
@@ -60,10 +62,9 @@ export function buildMessages({
   headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
-  const messages = [
-    {
-      role: "user",
-      content: [
+  const userContent = ocrText
+    ? [{ type: "text", text: buildOcrCleanupPrompt(pageRange, ocrText, { latexMath, locale, headingContext }) }]
+    : [
         {
           type: "document",
           source: {
@@ -73,7 +74,11 @@ export function buildMessages({
           },
         },
         { type: "text", text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }) },
-      ],
+      ];
+  const messages = [
+    {
+      role: "user",
+      content: userContent,
     },
   ];
   for (const turn of clarifyHistory || []) {
@@ -96,6 +101,7 @@ export function buildRequestBody({
   startPage,
   endPage,
   pdfBytes,
+  ocrText = "",
   latexMath = false,
   clarifyHistory = [],
   locale = "en",
@@ -111,6 +117,7 @@ export function buildRequestBody({
       startPage,
       endPage,
       pdfBytes,
+      ocrText,
       latexMath,
       clarifyHistory,
       locale,
@@ -127,6 +134,7 @@ export async function transcribeBatch({
   startPage,
   endPage,
   pdfBytes,
+  ocrText = "",
   signal,
   maxRetries = RETRYABLE_MAX_RETRIES,
   onRetry,
@@ -144,6 +152,7 @@ export async function transcribeBatch({
     startPage,
     endPage,
     pdfBytes,
+    ocrText,
     latexMath,
     clarifyHistory,
     locale,

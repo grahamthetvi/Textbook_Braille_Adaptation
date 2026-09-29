@@ -12,6 +12,7 @@ import {
 import { MAX_OUTPUT_TOKENS, normalizeEffort } from "./models.js";
 import {
   buildInterpretationPrompt,
+  buildOcrCleanupPrompt,
   buildStyleRules,
   formatClarifyFollowUp,
   formatClarifyModelTurn,
@@ -63,6 +64,7 @@ export function buildInput({
   startPage,
   endPage,
   pdfBytes,
+  ocrText = "",
   latexMath = false,
   clarifyHistory = [],
   locale = "en",
@@ -70,10 +72,9 @@ export function buildInput({
   headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
-  const input = [
-    {
-      role: "user",
-      content: [
+  const userContent = ocrText
+    ? [{ type: "input_text", text: buildOcrCleanupPrompt(pageRange, ocrText, { latexMath, locale, headingContext }) }]
+    : [
         {
           type: "input_file",
           filename: `pages-${pageRange}.pdf`,
@@ -84,7 +85,11 @@ export function buildInput({
           type: "input_text",
           text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }),
         },
-      ],
+      ];
+  const input = [
+    {
+      role: "user",
+      content: userContent,
     },
   ];
   for (const turn of clarifyHistory || []) {
@@ -112,6 +117,7 @@ export function buildRequestBody({
   startPage,
   endPage,
   pdfBytes,
+  ocrText = "",
   latexMath = false,
   clarifyHistory = [],
   locale = "en",
@@ -127,6 +133,7 @@ export function buildRequestBody({
       startPage,
       endPage,
       pdfBytes,
+      ocrText,
       latexMath,
       clarifyHistory,
       locale,
@@ -143,6 +150,7 @@ export async function transcribeBatch({
   startPage,
   endPage,
   pdfBytes,
+  ocrText = "",
   signal,
   maxRetries = RETRYABLE_MAX_RETRIES,
   onRetry,
@@ -160,6 +168,7 @@ export async function transcribeBatch({
     startPage,
     endPage,
     pdfBytes,
+    ocrText,
     latexMath,
     clarifyHistory,
     locale,

@@ -159,6 +159,12 @@ export const ar = {
   "status.batchProgress": "الدفعة {index} من {total}: الصفحات {range}",
   "status.batchProgressEmptyRetry":
     "الدفعة {index} من {total}: الصفحات {range}. إعادة المحاولة بعد أن أكد مراجع وجود نص مطبوع.",
+  "status.recitationFallback":
+    "تم اكتشاف عامل تصفية التلاوة في الصفحات {range}. جارٍ استخراج النص باستخدام التعرف البصري على الحروف داخل المتصفح…",
+  "status.ocrCleaning":
+    "جارٍ تنسيق نص التعرف البصري داخل المتصفح باستخدام {model} للصفحات {range}…",
+  "status.ocrExtractingPage":
+    "جارٍ تشغيل التعرف البصري داخل المتصفح على الصفحة {page} من الصفحات {range}…",
   "status.batchRetry": "الدفعة {index} من {total}. {message}",
   "status.pausedClarify":
     "متوقف عند الصفحات {range}. يحتاج Gemini إلى توضيح قبل أن تكتمل تلك الدفعة.",
@@ -287,6 +293,11 @@ export const ar = {
   "ollama.noPages": "تعذّر تحويل صفحات PDF إلى صور لـ Ollama.",
   "ollama.refreshFailed":
     "تعذّر سرد نماذج Ollama. تأكد أن المحوّل المحلي يعمل وأن نموذج رؤية قد نُزّل.",
+
+  "ocr.noTextExtracted":
+    "لم يتمكن التعرف البصري على الحروف داخل المتصفح من استخراج نص مقروء من الصفحات {range}.",
+  "ocr.failed":
+    "فشل التعرف البصري على الحروف داخل المتصفح في الصفحات {range}: {error}",
 
   "runControl.remainingNotSent": "لم تُرسل الدفعات المتبقية بسبب هذا الفشل.",
   "runControl.cancelled": "أُلغي. لا تزال الدفعات المكتملة متاحة للتنزيل.",
