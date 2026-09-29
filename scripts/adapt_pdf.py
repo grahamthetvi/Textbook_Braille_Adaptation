@@ -55,6 +55,7 @@ Comma-group multi-digit numbers when it aids comprehension, for example 1,000 st
 Write "and" not an ampersand unless the ampersand appears in the source.
 Skip decorative word clouds unless specific words are required for the lesson. Transcribe the book title, edition, and copyright block on a cover when printed as normal text. When a page has no readable lesson content, write: Transcriber note: A decorative word cloud fills the cover; no lesson text is present.
 Do not return an empty reply when printed lesson text is visible. If you cannot transcribe, ask a CLARIFY question instead of silence.
+A batch can mix printed pages with a blank page. Transcribe every page that has lesson text. Skip a page with no printed marks. Do not return an empty reply for the whole batch when any page has lesson text.
 Keep the full URL on one line when the book prints it that way. You may introduce it plainly, for example Permissions website: followed by the URL.
 Output markdown or plain text only when completing a batch. No preamble, no code fences.
 """
@@ -109,6 +110,8 @@ def build_interpretation_prompt(
         f"{heading_block}"
         "Output markdown or plain text only when completing the batch. No preamble, no "
         "code fences.\n"
+        "If one page in this batch has no printed marks, skip that page and transcribe "
+        "the others. Do not return an empty reply for the batch.\n"
         f"Source pages in this batch: {page_range}."
     )
 

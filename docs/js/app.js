@@ -5,6 +5,7 @@
 
 import { splitPdfBytes, inspectPdf, extractPagePdfs } from "./pdf-split.js";
 import { renderPageCanvas } from "./pdf-preview.js";
+import { straightenPdfBytes } from "./straighten.js";
 import { transcribeBatch } from "./transcribe.js";
 import {
   CUSTOM_MODEL_VALUE,
@@ -47,6 +48,7 @@ import {
 } from "./blank-pages.js";
 
 const LEGACY_SESSION_KEY = "textbook-adapter-api-key";
+const STRAIGHTEN_KEY = "textbook-adapter-straighten";
 const SESSION_KEY_PREFIX = "textbook-adapter-api-key-";
 const SESSION_OLLAMA_URL = "textbook-adapter-ollama-url";
 const SESSION_OLLAMA_MODEL = "textbook-adapter-ollama-model";
@@ -124,6 +126,7 @@ function cacheElements() {
   els.downloadMdBtn = document.getElementById("download-md-btn");
   els.downloadZipBtn = document.getElementById("download-zip-btn");
   els.latexMath = document.getElementById("latex-math");
+  els.straighten = document.getElementById("straighten-pages");
   els.clarifySection = document.getElementById("clarify-section");
   els.clarifyMeta = document.getElementById("clarify-meta");
   els.clarifyQuestion = document.getElementById("clarify-question");
@@ -358,6 +361,33 @@ function persistApiKey(provider = state.provider) {
       return;
     }
     sessionStorage.removeItem(sessionKeyFor(provider));
+  } catch {
+    // Ignore missing storage.
+  }
+}
+
+function restoreStraighten() {
+  if (!els.straighten) {
+    return;
+  }
+  try {
+    const stored = localStorage.getItem(STRAIGHTEN_KEY);
+    if (stored === "0") {
+      els.straighten.checked = false;
+    } else if (stored === "1") {
+      els.straighten.checked = true;
+    }
+  } catch {
+    // Ignore missing storage.
+  }
+}
+
+function persistStraighten() {
+  if (!els.straighten) {
+    return;
+  }
+  try {
+    localStorage.setItem(STRAIGHTEN_KEY, els.straighten.checked ? "1" : "0");
   } catch {
     // Ignore missing storage.
   }
@@ -772,6 +802,7 @@ function resetBatchesFromRanges(ranges) {
     endPage: range.endPage,
     pageCount: range.endPage - range.startPage + 1,
     bytes: null,
+    rawBytes: null,
     status: "pending",
     markdown: "",
     issues: [],
@@ -851,6 +882,7 @@ function mergeSplitBatches(split) {
       endPage: item.endPage,
       pageCount: item.pageCount,
       bytes: item.bytes,
+      rawBytes: item.bytes,
       status,
       markdown: previous?.markdown || "",
       issues: previous?.issues || [],
@@ -881,6 +913,27 @@ async function ensureBatchBytes() {
   state.lastSplitPreferred = preferred;
   mergeSplitBatches(batches);
   render();
+}
+
+async function prepareBatchPdf(batch) {
+  const raw = batch.rawBytes || batch.bytes;
+  if (!raw) {
+    return 0;
+  }
+  if (!els.straighten?.checked) {
+    batch.bytes = raw;
+    return 0;
+  }
+  if (batch.orientedRaw === raw && batch.orientedBytes) {
+    batch.bytes = batch.orientedBytes;
+    return batch.rotatedPages || 0;
+  }
+  const result = await straightenPdfBytes(raw);
+  batch.orientedRaw = raw;
+  batch.orientedBytes = result.bytes;
+  batch.rotatedPages = result.rotatedPages;
+  batch.bytes = result.bytes;
+  return result.rotatedPages;
 }
 
 async function runAdaptation({ retryOnly = null } = {}) {
@@ -952,7 +1005,19 @@ async function runAdaptation({ retryOnly = null } = {}) {
         batch.locale = getLocale();
       }
       const pageRange = formatPageRange(batch.startPage, batch.endPage);
-      if (batch.emptyRetry) {
+      if (els.straighten?.checked) {
+        setStatus("status.checkingOrientation", { range: pageRange });
+        render();
+      }
+      const rotatedPages = await prepareBatchPdf(batch);
+      if (rotatedPages) {
+        setStatus("status.straightened", {
+          index: index + 1,
+          total,
+          range: pageRange,
+          count: rotatedPages,
+        });
+      } else if (batch.emptyRetry) {
         setStatus("status.batchProgressEmptyRetry", {
           index: index + 1,
           total,
@@ -1238,6 +1303,9 @@ function bindEvents() {
   els.themeToggle.addEventListener("click", () => {
     toggleTheme();
   });
+  els.straighten?.addEventListener("change", () => {
+    persistStraighten();
+  });
   els.pdfFile.addEventListener("change", () => {
     const file = els.pdfFile.files?.[0];
     if (file) {
@@ -1309,4 +1377,5 @@ populateOllamaSelect([]);
 bindEvents();
 setLocale(detectLocale());
 refreshUi();
+restoreStraighten();
 restoreApiKey();

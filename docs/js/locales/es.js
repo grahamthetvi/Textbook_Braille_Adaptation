@@ -22,6 +22,9 @@ export const es = {
   "form.latexMath": "Envolver las matemáticas en LaTeX (para Nemeth)",
   "form.latexHint":
     "Desactivado por defecto: las matemáticas se leen como texto sencillo. Si lo marcas, el modelo envuelve las matemáticas en LaTeX para poder convertirlas después a Nemeth.",
+  "form.straighten": "Enderezar escaneos de lado antes de enviarlos",
+  "form.straightenHint":
+    "Activado por defecto. Las páginas giradas a la izquierda o a la derecha se ponen verticales antes de que las vea el modelo. Déjalo activado si un lote no devuelve texto y la vista previa está de lado. Desmárcalo si una página vuelve girada al revés y reintenta ese lote.",
   "form.advanced": "Avanzado: URL de proxy opcional de Gemini",
   "form.proxyUrl": "URL del proxy",
   "form.proxyHint":
@@ -124,7 +127,7 @@ export const es = {
 
   "blank.heading": "Salida en blanco — revisa las páginas originales",
   "blank.hint":
-    "Gemini no devolvió texto para este lote. Puede que las páginas de origen estén en blanco, o que el modelo no haya visto el contenido impreso. Compara las páginas originales y luego omítelas si están en blanco o reintenta si tienen texto de la lección. Reintentar le dice a Gemini que un revisor confirmó texto impreso, así que debe transcribir estas páginas en lugar de devolver un resultado vacío. Los lotes pendientes restantes esperan hasta que elijas.",
+    "Gemini no devolvió texto para este lote. Puede que las páginas de origen estén en blanco, o que el modelo no haya visto el contenido impreso. Compara las páginas originales y luego omítelas si están en blanco o reintenta si tienen texto de la lección. Omite el lote solo cuando todas las páginas estén en blanco. Si una página de la vista previa está de lado, deja activado Enderezar escaneos de lado y reintenta. Reintentar le dice a Gemini que un revisor confirmó texto impreso, así que debe transcribir estas páginas en lugar de devolver un resultado vacío. Los lotes pendientes restantes esperan hasta que elijas.",
   "blank.skip": "Omitir por estar en blanco",
   "blank.retry": "Reintentar: las páginas tienen texto",
   "blank.pages": "páginas {range}",
@@ -149,6 +152,9 @@ export const es = {
   "status.plannedMany":
     "Se planificaron {batches} lotes a partir de {count} páginas. El modelo no se llama hasta que adaptes.",
   "status.splitting": "Dividiendo el PDF en lotes…",
+  "status.checkingOrientation": "Comprobando la orientación de las páginas {range}…",
+  "status.straightened":
+    "Lote {index} de {total}: páginas {range}. Se enderezaron {count} páginas que estaban de lado.",
   "status.noPending":
     "No hay lotes pendientes. Reintenta una fila fallida o descarga lo que ya se completó.",
   "status.batchProgress": "Lote {index} de {total}: páginas {range}",
@@ -247,6 +253,8 @@ export const es = {
   "gemini.unreachable":
     "No se pudo llegar a Gemini. Si esta página no puede llamar a Google, ejecuta python3 scripts/serve_adapter.py y usa esa dirección local, o configura una URL de proxy.",
   "gemini.empty": "Gemini devolvió texto vacío para este lote.",
+  "gemini.emptyReason":
+    "Gemini no devolvió texto (motivo de finalización: {reason}). Este lote no se trató como páginas en blanco.",
   "gemini.failedAfterRetries": "La solicitud a Gemini falló tras los reintentos.",
 
   "claude.modelSonnet5": "Claude Sonnet 5 (recomendado)",

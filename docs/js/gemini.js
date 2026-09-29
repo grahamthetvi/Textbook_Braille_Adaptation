@@ -96,6 +96,17 @@ export function geminiError(message, { retryable = false, httpStatus = 0 } = {})
   return requestError(message, { retryable, httpStatus });
 }
 
+const BLANK_FINISH_REASONS = new Set(["", "STOP", "FINISH_REASON_UNSPECIFIED"]);
+
+/** Empty STOP is the blank-page review. Other finish reasons are real failures. */
+export function emptyOutputError(payload) {
+  const reason = String(payload?.candidates?.[0]?.finishReason || "");
+  if (BLANK_FINISH_REASONS.has(reason)) {
+    return geminiError(t("gemini.empty"));
+  }
+  return geminiError(t("gemini.emptyReason", { reason }));
+}
+
 export function describeGeminiError(payload, status, options = {}) {
   const exhausted = Boolean(options?.exhausted);
   const message = payload?.error?.message || payload?.error?.status || "";
@@ -230,7 +241,7 @@ export async function transcribeBatch({
 
   const text = stripModelFences(extractText(payload));
   if (!text) {
-    throw geminiError(t("gemini.empty"));
+    throw emptyOutputError(payload);
   }
   return text;
 }

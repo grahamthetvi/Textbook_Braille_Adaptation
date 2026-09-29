@@ -209,6 +209,16 @@
             Off by default: math is spoken plain text. When checked, the model wraps
             math in LaTeX so it can later be converted to Nemeth.
           </p>
+          <div class="field checkbox-field">
+            <input id="straighten-pages" name="straighten-pages" type="checkbox" checked />
+            <label for="straighten-pages" data-i18n="form.straighten">Straighten sideways scans before sending</label>
+          </div>
+          <p class="hint" data-i18n="form.straightenHint">
+            On by default. Pages turned left or right are rotated upright before the
+            model sees them. Leave this on when a batch returns no text and the
+            preview shows sideways pages. Uncheck it if a page comes back turned
+            the wrong way, then retry that batch.
+          </p>
         </fieldset>
 
         <details class="panel advanced" id="advanced-proxy">

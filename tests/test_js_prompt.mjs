@@ -98,6 +98,9 @@ test("empty-output retry tells Gemini a reviewer confirmed printed text", () => 
   assert.match(retry, /reviewer looked at the original scans/);
   assert.match(retry, /previous reply was empty/);
   assert.match(retry, /Do not return empty output/);
+  assert.match(retry, /One page in the batch may be blank/);
+  assert.match(STYLE_RULES, /mix printed pages with a blank page/);
+  assert.match(firstTry, /skip that page and transcribe the others/);
   assert.match(retry, /CLARIFY/);
   assert.match(retry, /\(unclear\)/);
   const spanish = formatEmptyRetryInstruction({ locale: "es" });
