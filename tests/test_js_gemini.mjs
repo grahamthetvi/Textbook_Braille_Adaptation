@@ -517,6 +517,46 @@ test("empty Gemini text throws the dedicated blank-batch message", async () => {
   );
 });
 
+test("empty STOP is the blank-page error", async () => {
+  await assert.rejects(
+    () =>
+      transcribeBatch({
+        apiKey: "test-key",
+        startPage: 1,
+        endPage: 2,
+        pdfBytes: new Uint8Array([1]),
+        fetchImpl: async () =>
+          jsonResponse(200, {
+            candidates: [{ finishReason: "STOP", content: { parts: [{ text: "   " }] } }],
+          }),
+      }),
+    (err) => {
+      assert.equal(err.message, EMPTY_BATCH_MESSAGE);
+      return true;
+    }
+  );
+});
+
+test("empty MAX_TOKENS is not treated as a blank page", async () => {
+  await assert.rejects(
+    () =>
+      transcribeBatch({
+        apiKey: "test-key",
+        startPage: 1,
+        endPage: 2,
+        pdfBytes: new Uint8Array([1]),
+        fetchImpl: async () =>
+          jsonResponse(200, {
+            candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [] } }],
+          }),
+      }),
+    (err) => {
+      assert.match(err.message, /MAX_TOKENS/);
+      assert.notEqual(err.message, EMPTY_BATCH_MESSAGE);
+      return true;
+    }
+  );
+});
 
 test("default Google API model is gemini-3.8-flash", () => {
   assert.equal(DEFAULT_MODEL, "gemini-3.8-flash");

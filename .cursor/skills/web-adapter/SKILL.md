@@ -23,9 +23,9 @@ Optional Gemini-only proxy URL on the page: `http://127.0.0.1:8000/api/gemini`.
 2. Paste the matching API key (none for Ollama). Keys stay per provider in session storage. Do not type Cursor slugs; Model and Effort are separate.
 3. Leave Effort on the recommended value: Gemini/Claude medium, OpenAI low, Ollama off.
 4. Drop a textbook PDF.
-5. Plan batches (5–8 pages).
-6. Adapt book.
-7. If the model returns no text, compare the original pages, then skip as blank or retry.
+5. Plan batches (5–8 pages). Leave **Straighten sideways scans** checked unless a page comes back turned the wrong way.
+6. Adapt book. Sideways pages are rotated upright before the model sees them.
+7. If the model returns no text, compare the original pages. Skip only when every page in the batch is blank. If any page has text, retry. A sideways preview means straightening should stay on.
 8. Download combined markdown or a zip.
 
 Ollama: `ollama pull qwen2.5vl` (or `gemma4`), then Refresh the model list. Spot-check the first batch.

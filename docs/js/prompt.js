@@ -31,6 +31,7 @@ Comma-group multi-digit numbers when it aids comprehension, for example 1,000 st
 Write "and" not an ampersand unless the ampersand appears in the source.
 Skip decorative word clouds unless specific words are required for the lesson. Transcribe the book title, edition, and copyright block on a cover when printed as normal text. When a page has no readable lesson content, write: Transcriber note: A decorative word cloud fills the cover; no lesson text is present.
 Do not return an empty reply when printed lesson text is visible. If you cannot transcribe, ask a CLARIFY question instead of silence.
+A batch can mix printed pages with a blank page. Transcribe every page that has lesson text. Skip a page with no printed marks. Do not return an empty reply for the whole batch when any page has lesson text.
 Keep the full URL on one line when the book prints it that way. You may introduce it plainly, for example Permissions website: followed by the URL.
 Output markdown or plain text only when completing a batch. No preamble, no code fences.
 `;
@@ -134,7 +135,7 @@ export function formatEmptyRetryInstruction(options = {}) {
   const lang = resolveOutputLanguage(options.locale);
   return `Retry after empty output
 A reviewer looked at the original scans for this batch and confirmed they contain printed lesson text. Your previous reply was empty. That was a miss, not a blank page.
-Transcribe every printed lesson on these pages now. Do not return empty output. Do not skip the batch. Read every page in the attached PDF. If a word is unreadable, write ${lang.unclearToken}. If you cannot reliably make the content accessible, return a ${lang.clarifyMarker} block instead of silence.
+Transcribe every printed lesson on these pages now. Do not return empty output. Do not skip the batch. One page in the batch may be blank: skip pages with no printed marks, and transcribe the rest. Read every page in the attached PDF. If a word is unreadable, write ${lang.unclearToken}. If you cannot reliably make the content accessible, return a ${lang.clarifyMarker} block instead of silence.
 Empty output is only for pages with no printed marks. These pages have printed text.`;
 }
 
@@ -155,6 +156,7 @@ Follow the system instruction. Transcribe faithfully. If you cannot reliably mak
 After a complete transcription, append a HEADINGS trailer listing level|title for every heading on these pages. Do not include a HEADINGS trailer when asking a ${lang.clarifyMarker} question. Keep the HEADINGS: marker in English.
 ${languageBlock}${mathLine}${headingBlock}
 Output markdown or plain text only when completing the batch. No preamble, no code fences.
+If one page in this batch has no printed marks, skip that page and transcribe the others. Do not return an empty reply for the batch.
 Source pages in this batch: ${pageRange}.${emptyRetry}`;
 }
 

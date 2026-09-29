@@ -54,6 +54,8 @@ class ServeAdapterTests(unittest.TestCase):
         self.assertIn("A failed batch, a clarification question, or blank output stops the run", body)
         self.assertIn("Download Word document", body)
         self.assertIn("Wrap math in LaTeX (for Nemeth)", body)
+        self.assertIn('id="straighten-pages"', body)
+        self.assertIn("Straighten sideways scans before sending", body)
         self.assertIn("clarify-section", body)
         self.assertIn('id="locale-select"', body)
         self.assertIn('id="locale-hint"', body)

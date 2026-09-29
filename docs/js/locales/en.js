@@ -22,6 +22,9 @@ export const en = {
   "form.latexMath": "Wrap math in LaTeX (for Nemeth)",
   "form.latexHint":
     "Off by default: math is spoken plain text. When checked, the model wraps math in LaTeX so it can later be converted to Nemeth.",
+  "form.straighten": "Straighten sideways scans before sending",
+  "form.straightenHint":
+    "On by default. Pages turned left or right are rotated upright before the model sees them. Leave this on when a batch returns no text and the preview shows sideways pages. Uncheck it if a page comes back turned the wrong way, then retry that batch.",
   "form.advanced": "Advanced: optional Gemini proxy URL",
   "form.proxyUrl": "Proxy URL",
   "form.proxyHint":
@@ -124,7 +127,7 @@ export const en = {
 
   "blank.heading": "Blank output — check original pages",
   "blank.hint":
-    "Gemini returned no text for this batch. That can mean the source pages are blank, or that the model missed printed content. Compare the original pages, then skip them if they are blank or retry if they have lesson text. Retry tells Gemini a reviewer confirmed printed text, so it must transcribe these pages instead of returning empty. Remaining pending batches wait until you choose.",
+    "Gemini returned no text for this batch. That can mean the source pages are blank, or that the model missed printed content. Compare the original pages, then skip them if they are blank or retry if they have lesson text. Skip only when every page in the batch is blank. If a page in the preview is sideways, leave Straighten sideways scans checked and retry. Retry tells Gemini a reviewer confirmed printed text, so it must transcribe these pages instead of returning empty. Remaining pending batches wait until you choose.",
   "blank.skip": "Skip as blank",
   "blank.retry": "Retry — pages have text",
   "blank.pages": "pages {range}",
@@ -149,6 +152,9 @@ export const en = {
   "status.plannedMany":
     "Planned {batches} batches from {count} pages. The model is not called until you adapt.",
   "status.splitting": "Splitting the PDF into batches…",
+  "status.checkingOrientation": "Checking which way pages {range} are turned…",
+  "status.straightened":
+    "Batch {index} of {total}: pages {range}. Turned {count} sideways pages upright.",
   "status.noPending": "No pending batches. Retry a failed row, or download what already completed.",
   "status.batchProgress": "Batch {index} of {total}: pages {range}",
   "status.batchProgressEmptyRetry":
@@ -245,6 +251,8 @@ export const en = {
   "gemini.unreachable":
     "Could not reach Gemini. If this page is blocked from calling Google, run python3 scripts/serve_adapter.py and use that local address, or set a proxy URL.",
   "gemini.empty": "Gemini returned empty text for this batch.",
+  "gemini.emptyReason":
+    "Gemini returned no text (finish reason: {reason}). This batch was not treated as blank pages.",
   "gemini.failedAfterRetries": "Gemini request failed after retries.",
 
   "claude.modelSonnet5": "Claude Sonnet 5 (recommended)",
