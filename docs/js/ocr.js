@@ -8,6 +8,80 @@ import { isRecitationError } from "./gemini.js";
 export { isRecitationError };
 
 /**
+ * Tesseract page segmentation mode 3: fully automatic layout, no orientation detection.
+ * This is the mode that reads a full textbook page in normal reading order.
+ */
+export const OCR_PAGE_SEGMENTATION_MODE = "3";
+
+/** LSTM models are trained near 300 DPI. Canvas PNGs carry no DPI metadata. */
+export const OCR_TARGET_DPI = 300;
+
+/** PDF user space is 72 points per inch. Scale 300/72 renders a page at the target DPI. */
+export const PDF_POINTS_PER_INCH = 72;
+
+export const OCR_RENDER_SCALE = OCR_TARGET_DPI / PDF_POINTS_PER_INCH;
+
+const MIN_LESSON_CHARS = 30;
+const MIN_LETTER_RATIO = 0.45;
+
+export function tesseractParameters(dpi = OCR_TARGET_DPI) {
+  return {
+    tessedit_pageseg_mode: OCR_PAGE_SEGMENTATION_MODE,
+    user_defined_dpi: String(dpi),
+  };
+}
+
+export function textLetterRatio(text) {
+  const compact = String(text || "").replace(/\s+/g, "");
+  if (!compact) {
+    return 0;
+  }
+  const letters = compact.match(/\p{L}/gu);
+  return (letters ? letters.length : 0) / compact.length;
+}
+
+function failsLessonQuality(text) {
+  const raw = String(text || "");
+  if (/\(cid:\d+\)/i.test(raw)) {
+    return true;
+  }
+  const compact = raw.replace(/\s+/g, "");
+  if (!compact) {
+    return true;
+  }
+  const weird = compact.match(/[\uFFFD\uE000-\uF8FF]/g);
+  if (weird && weird.length / compact.length > 0.02) {
+    return true;
+  }
+  return textLetterRatio(raw) < MIN_LETTER_RATIO;
+}
+
+/** True when extracted text is long enough and mostly real letters, not scan garbage. */
+export function isUsableLessonText(text, { minChars = MIN_LESSON_CHARS } = {}) {
+  const compactLen = String(text || "").replace(/\s+/g, "").length;
+  if (compactLen < minChars) {
+    return false;
+  }
+  return !failsLessonQuality(text);
+}
+
+/**
+ * Long symbol soup from a broken text layer or a mis-set Tesseract run.
+ * Short text is sparse, not garbled.
+ */
+export function isGarbledLessonText(text, { minChars = MIN_LESSON_CHARS } = {}) {
+  const compactLen = String(text || "").replace(/\s+/g, "").length;
+  if (compactLen < minChars) {
+    return false;
+  }
+  return failsLessonQuality(text);
+}
+
+function combinedPageText(pages) {
+  return (pages || []).map((page) => page?.text || "").join("\n");
+}
+
+/**
  * Group and format raw pdf.js text items into reading order lines and paragraphs.
  * Items with similar vertical (y) coordinates are grouped onto lines and sorted by x.
  */
@@ -95,13 +169,64 @@ export async function extractPdfTextLayer(pdfBytes, { pdfLib = null } = {}) {
   }
 }
 
+function dpiForScale(scale) {
+  return String(Math.max(70, Math.round(PDF_POINTS_PER_INCH * scale)));
+}
+
+/**
+ * Tesseract.recognize(image, lang, options) treats options as worker setup, not
+ * tessedit variables. PSM and DPI have to be the createWorker config and the
+ * recognize options on that worker.
+ */
+async function openTesseractSession(tess, lang, dpi) {
+  const params = tesseractParameters(dpi);
+  if (typeof tess.createWorker === "function") {
+    const oem = tess.OEM?.LSTM_ONLY ?? 1;
+    const worker = await tess.createWorker(lang, oem, {}, params);
+    if (typeof worker.setParameters === "function") {
+      await worker.setParameters(params);
+    }
+    return {
+      params,
+      recognize(canvas) {
+        return worker.recognize(canvas, params);
+      },
+      async terminate() {
+        if (typeof worker.terminate !== "function") {
+          return;
+        }
+        try {
+          await worker.terminate();
+        } catch {
+          // Shutting down the worker must not discard a finished transcript.
+        }
+      },
+    };
+  }
+  return {
+    params,
+    recognize(canvas) {
+      return tess.recognize(canvas, lang, params);
+    },
+    async terminate() {},
+  };
+}
+
+function paintWhiteBackground(context, width, height) {
+  context.fillStyle = "#ffffff";
+  if (typeof context.fillRect === "function") {
+    context.fillRect(0, 0, width, height);
+  }
+}
+
 /**
  * Run client-side OCR on rendered page canvases using Tesseract.js if available.
+ * Pages are rendered near 300 DPI on a white background and read with PSM 3.
  */
 export async function runRasterOcrOnPages(pdfBytes, {
   pdfLib = null,
   tesseractLib = null,
-  scale = 2,
+  scale = OCR_RENDER_SCALE,
   lang = "eng",
   startPage = 1,
   endPage = 1,
@@ -109,7 +234,8 @@ export async function runRasterOcrOnPages(pdfBytes, {
 } = {}) {
   const lib = pdfLib || requirePdfJs();
   const tess = tesseractLib || globalThis.Tesseract;
-  if (!tess?.recognize) {
+  const canRecognize = typeof tess?.createWorker === "function" || typeof tess?.recognize === "function";
+  if (!canRecognize) {
     return { pages: [], totalChars: 0, available: false };
   }
 
@@ -119,8 +245,10 @@ export async function runRasterOcrOnPages(pdfBytes, {
   const pages = [];
   let totalChars = 0;
   const pageRange = formatPageRange(startPage, endPage);
+  let session = null;
 
   try {
+    session = await openTesseractSession(tess, lang, dpiForScale(scale));
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const absolutePage = startPage + pageNumber - 1;
       if (onProgress) {
@@ -135,24 +263,42 @@ export async function runRasterOcrOnPages(pdfBytes, {
       if (!context) {
         continue;
       }
-      await page.render({ canvasContext: context, viewport }).promise;
-      const result = await tess.recognize(canvas, lang);
+      paintWhiteBackground(context, canvas.width, canvas.height);
+      await page.render({
+        canvasContext: context,
+        viewport,
+        background: "#ffffff",
+      }).promise;
+      const result = await session.recognize(canvas);
       const pageText = String(result?.data?.text || "").trim();
       totalChars += pageText.replace(/\s+/g, "").length;
       pages.push({ pageNumber, text: pageText });
     }
     return { pages, totalChars, available: true, pageCount: pdf.numPages };
   } finally {
+    if (session) {
+      await session.terminate();
+    }
     if (typeof pdf.destroy === "function") {
       await pdf.destroy();
     }
   }
 }
 
+function formatOcrPages(pages, startPage) {
+  return pages
+    .map((page) => {
+      const absPage = startPage + page.pageNumber - 1;
+      return `=== Page ${absPage} ===\n${page.text}`;
+    })
+    .join("\n\n");
+}
+
 /**
  * Extract OCR text across a batch PDF.
- * Tries the high-fidelity embedded text layer first. If empty or sparse (<30 chars),
- * falls back to raster canvas OCR with Tesseract.js.
+ * Uses a real embedded text layer when it is legible. A garbled text layer
+ * (common on scans that already contain a failed OCR pass) is skipped in favor
+ * of Tesseract PSM 3 on the page image.
  */
 export async function extractBatchOcrText(pdfBytes, options = {}) {
   const startPage = options.startPage || 1;
@@ -160,31 +306,23 @@ export async function extractBatchOcrText(pdfBytes, options = {}) {
   const pageRange = formatPageRange(startPage, endPage);
   const onProgress = options.onProgress || null;
 
-  // 1. Try extracting embedded text layer
   let textLayerResult;
   try {
     textLayerResult = await extractPdfTextLayer(pdfBytes, options);
-  } catch (err) {
+  } catch {
     textLayerResult = { pages: [], totalChars: 0, pageCount: 0 };
   }
 
-  // If text layer has substantial content (>= 30 non-whitespace chars across batch)
-  if (textLayerResult.totalChars >= 30) {
-    const formatted = textLayerResult.pages
-      .map((p) => {
-        const absPage = startPage + p.pageNumber - 1;
-        return `=== Page ${absPage} ===\n${p.text}`;
-      })
-      .join("\n\n");
+  const layerText = combinedPageText(textLayerResult.pages);
+  if (isUsableLessonText(layerText)) {
     return {
-      text: formatted,
+      text: formatOcrPages(textLayerResult.pages, startPage),
       method: "text-layer",
       pageCount: textLayerResult.pageCount,
       totalChars: textLayerResult.totalChars,
     };
   }
 
-  // 2. Fall back to raster OCR if text layer is empty or sparse (< 30 chars)
   const rasterResult = await runRasterOcrOnPages(pdfBytes, {
     ...options,
     startPage,
@@ -192,40 +330,28 @@ export async function extractBatchOcrText(pdfBytes, options = {}) {
     onProgress,
   });
 
-  if (rasterResult.available && rasterResult.totalChars >= 30) {
-    const formatted = rasterResult.pages
-      .map((p) => {
-        const absPage = startPage + p.pageNumber - 1;
-        return `=== Page ${absPage} ===\n${p.text}`;
-      })
-      .join("\n\n");
+  const rasterText = combinedPageText(rasterResult.pages);
+  if (rasterResult.available && isUsableLessonText(rasterText)) {
     return {
-      text: formatted,
+      text: formatOcrPages(rasterResult.pages, startPage),
       method: "raster-ocr",
       pageCount: rasterResult.pageCount,
       totalChars: rasterResult.totalChars,
     };
   }
 
-  // 3. If raster produced some text or text layer had some text
-  if (rasterResult.totalChars > 0) {
-    const formatted = rasterResult.pages
-      .map((p) => `=== Page ${startPage + p.pageNumber - 1} ===\n${p.text}`)
-      .join("\n\n");
+  if (rasterResult.totalChars > 0 && !isGarbledLessonText(rasterText)) {
     return {
-      text: formatted,
+      text: formatOcrPages(rasterResult.pages, startPage),
       method: "raster-ocr-sparse",
       pageCount: rasterResult.pageCount,
       totalChars: rasterResult.totalChars,
     };
   }
 
-  if (textLayerResult.totalChars > 0) {
-    const formatted = textLayerResult.pages
-      .map((p) => `=== Page ${startPage + p.pageNumber - 1} ===\n${p.text}`)
-      .join("\n\n");
+  if (textLayerResult.totalChars > 0 && !isGarbledLessonText(layerText)) {
     return {
-      text: formatted,
+      text: formatOcrPages(textLayerResult.pages, startPage),
       method: "text-layer-sparse",
       pageCount: textLayerResult.pageCount,
       totalChars: textLayerResult.totalChars,

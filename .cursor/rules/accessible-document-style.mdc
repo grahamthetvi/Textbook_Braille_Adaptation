@@ -107,6 +107,8 @@ GOOD: `Transcriber note: A decorative word cloud fills the cover; no lesson text
 BAD: dropping a page because Gemini returned no text, without checking the original scan
 BAD: an empty model reply when the scan has printed lesson text
 GOOD: transcribe the printed text; if you cannot, ask a CLARIFY question. Empty output is only for pages with no printed marks
+BAD: rejecting an OCR transcript as entirely garbled when lesson sentences or numbered items are still readable
+GOOD: clean ordinary misread letters and transcribe the lesson; ask for a clearer scan only when no lesson words remain
 GOOD: `Transcriber note: Source pages 006-010 were blank and skipped after visual review.` when the original pages are confirmed blank
 
 ## URLs and web addresses

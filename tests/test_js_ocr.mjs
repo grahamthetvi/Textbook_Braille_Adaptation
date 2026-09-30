@@ -3,8 +3,14 @@ import { before, test } from "node:test";
 import {
   extractBatchOcrText,
   formatPageTextItems,
+  isGarbledLessonText,
   isRecitationError,
+  isUsableLessonText,
+  OCR_PAGE_SEGMENTATION_MODE,
+  OCR_RENDER_SCALE,
+  OCR_TARGET_DPI,
   extractPdfTextLayer,
+  tesseractParameters,
 } from "../docs/js/ocr.js";
 import {
   buildOcrCleanupPrompt,
@@ -63,6 +69,8 @@ test("buildOcrCleanupPrompt formats raw OCR text with style and headings instruc
   });
   assert.match(prompt, /optical character recognition \(OCR\)/);
   assert.match(prompt, /001-006/);
+  assert.match(prompt, /page segmentation \(mode 3\)/);
+  assert.match(prompt, /Do not reply that the OCR text is entirely garbled/);
   assert.match(prompt, /Strip running headers, footers, and lone page numbers/);
   assert.match(prompt, /Rejoin line-break hyphens/);
   assert.match(prompt, /HEADINGS trailer/);
@@ -236,6 +244,163 @@ test("extractBatchOcrText falls back to raster OCR when text layer is empty", as
       globalThis.document.createElement = originalCreateElement;
     }
   }
+});
+
+test("tesseractParameters uses automatic page segmentation and 300 DPI", () => {
+  assert.deepEqual(tesseractParameters(), {
+    tessedit_pageseg_mode: OCR_PAGE_SEGMENTATION_MODE,
+    user_defined_dpi: String(OCR_TARGET_DPI),
+  });
+  assert.equal(OCR_PAGE_SEGMENTATION_MODE, "3");
+  assert.equal(OCR_RENDER_SCALE, OCR_TARGET_DPI / 72);
+});
+
+test("isUsableLessonText accepts prose and rejects symbol soup and cid fonts", () => {
+  const prose = "Adjectives describe nouns. The tall student carried a heavy backpack to class.";
+  assert.equal(isUsableLessonText(prose), true);
+  assert.equal(isGarbledLessonText(prose), false);
+
+  const garbage = "~`|\\/#@ ¤§¶†‡ •°±×÷ ¿¡ ™®© ¥£¢ € ¤ ~`|\\/#@ ¤§¶†‡ •°±×÷";
+  assert.equal(isUsableLessonText(garbage), false);
+  assert.equal(isGarbledLessonText(garbage), true);
+  assert.equal(isUsableLessonText("(cid:12)(cid:34)(cid:56)(cid:78)(cid:90)(cid:11)(cid:22)"), false);
+  assert.equal(isGarbledLessonText("Hi"), false);
+  assert.equal(isUsableLessonText("Hi"), false);
+});
+
+function installCanvasDocument() {
+  const calls = { fillRect: 0 };
+  const originalDocument = globalThis.document;
+  globalThis.document = {
+    createElement(tag) {
+      if (tag === "canvas") {
+        return {
+          width: 0,
+          height: 0,
+          getContext() {
+            return {
+              fillStyle: "",
+              fillRect() {
+                calls.fillRect += 1;
+              },
+            };
+          },
+        };
+      }
+      return {};
+    },
+  };
+  return {
+    calls,
+    restore() {
+      if (originalDocument) {
+        globalThis.document = originalDocument;
+      }
+    },
+  };
+}
+
+function pdfWithText(itemsByPage, { recordScale = null } = {}) {
+  const pageCount = itemsByPage.length;
+  return {
+    getDocument() {
+      return {
+        promise: Promise.resolve({
+          numPages: pageCount,
+          getPage(pageNum) {
+            return Promise.resolve({
+              getTextContent() {
+                return Promise.resolve({ items: itemsByPage[pageNum - 1] || [] });
+              },
+              getViewport(options) {
+                if (recordScale) {
+                  recordScale.scale = options?.scale;
+                }
+                return { width: 100, height: 140 };
+              },
+              render() {
+                return { promise: Promise.resolve() };
+              },
+            });
+          },
+          destroy() {
+            return Promise.resolve();
+          },
+        }),
+      };
+    },
+  };
+}
+
+test("extractBatchOcrText skips a garbled text layer and reads the page with PSM 3", async () => {
+  const garbage = Array.from({ length: 12 }, () => "¤§¶†‡•°±×÷~`|#@").join(" ");
+  const recordScale = {};
+  const dom = installCanvasDocument();
+  let workerConfig = null;
+  let recognizeOptions = null;
+  let terminated = false;
+  const mockTesseract = {
+    OEM: { LSTM_ONLY: 1 },
+    createWorker(lang, oem, workerOptions, config) {
+      workerConfig = { lang, oem, workerOptions, config };
+      return Promise.resolve({
+        setParameters(params) {
+          recognizeOptions = { ...(recognizeOptions || {}), setParameters: params };
+          return Promise.resolve();
+        },
+        recognize(_canvas, params) {
+          recognizeOptions = { ...(recognizeOptions || {}), recognize: params };
+          return Promise.resolve({
+            data: {
+              text: "Adjectives describe nouns. The tall student carried a heavy backpack.",
+            },
+          });
+        },
+        terminate() {
+          terminated = true;
+          return Promise.resolve();
+        },
+      });
+    },
+  };
+
+  try {
+    const result = await extractBatchOcrText(new Uint8Array([1, 2, 3]), {
+      startPage: 1,
+      endPage: 6,
+      pdfLib: pdfWithText([[{ str: garbage, transform: [10, 0, 0, 10, 40, 700] }]], { recordScale }),
+      tesseractLib: mockTesseract,
+    });
+    assert.equal(result.method, "raster-ocr");
+    assert.match(result.text, /Adjectives describe nouns/);
+    assert.equal(result.text.includes("¤"), false);
+    assert.equal(workerConfig.lang, "eng");
+    assert.equal(workerConfig.oem, 1);
+    assert.deepEqual(workerConfig.workerOptions, {});
+    assert.equal(workerConfig.config.tessedit_pageseg_mode, "3");
+    assert.equal(workerConfig.config.user_defined_dpi, "300");
+    assert.equal(recognizeOptions.recognize.tessedit_pageseg_mode, "3");
+    assert.equal(recognizeOptions.setParameters.user_defined_dpi, "300");
+    assert.equal(recordScale.scale, OCR_RENDER_SCALE);
+    assert.equal(dom.calls.fillRect, 1);
+    assert.equal(terminated, true);
+  } finally {
+    dom.restore();
+  }
+});
+
+test("extractBatchOcrText throws when the text layer is garbled and raster OCR finds nothing", async () => {
+  const garbage = "¤§¶†‡•°±×÷~`|#@ ".repeat(8);
+  await assert.rejects(
+    () =>
+      extractBatchOcrText(new Uint8Array([1, 2, 3]), {
+        startPage: 1,
+        endPage: 6,
+        pdfLib: pdfWithText([[{ str: garbage, transform: [10, 0, 0, 10, 40, 700] }]]),
+        tesseractLib: null,
+      }),
+    /In-browser OCR could not extract readable text from pages 001-006/
+  );
 });
 
 test("extractBatchOcrText throws when both text layer and raster OCR return nothing", async () => {

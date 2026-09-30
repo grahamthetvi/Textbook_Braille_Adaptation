@@ -203,8 +203,12 @@ export function buildOcrCleanupPrompt(pageRange, ocrText, options = {}) {
   return `The following raw text was extracted by optical character recognition (OCR) from textbook pages ${pageRange}.
 Clean up, format, and structure this text into screen-reader-accessible Markdown. Do not output braille, contractions, or braille ASCII. Transcribe faithfully. Do not change lesson content.
 
+This text was extracted in the browser. It may be the PDF text layer, or a Tesseract reading with automatic page segmentation (mode 3) at about 300 DPI. That mode reads a full textbook page in normal reading order. There is no page image attached. This text is the source.
+
 Follow the system instruction:
-- The OCR text may contain broken line breaks, scanning artifacts, merged or split words, OCR character misreads, and out-of-order running headers or footers.
+- Expect broken line breaks, merged or split words, a few misread letters, and out-of-order running headers or footers. Those are ordinary OCR noise.
+- When lesson words, sentences, or numbered practice items are present, clean them and transcribe the lesson. Do not reply that the OCR text is entirely garbled, and do not ask for a clearer scan.
+- Ask a clarification question only when the raw text has no recoverable lesson words.
 - Strip running headers, footers, and lone page numbers.
 - Rejoin line-break hyphens: "mod-" plus next-line "ify" becomes "modify". Keep real hyphens such as "Joyner-Kersee".
 - Fix obvious OCR character recognition errors based on lesson context.
