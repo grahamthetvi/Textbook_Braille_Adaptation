@@ -483,6 +483,24 @@ class AdaptPdfClarifyAndLatexRequestTests(unittest.TestCase):
         self.assertIn("CLI has no chat", str(raised.exception))
         self.assertIn("Is this a map?", str(raised.exception))
 
+    def test_recitation_empty_reply_explains_the_filter(self):
+        def recitation(request, timeout=180):
+            payload = {"candidates": [{"finishReason": "RECITATION", "content": {"parts": []}}]}
+            return _FakeResponse(json.dumps(payload).encode("utf-8"))
+
+        with self.assertRaises(RuntimeError) as raised:
+            transcribe_pdf_bytes(
+                b"%PDF-fake",
+                "001-006",
+                "test-key",
+                "gemini-3.8-flash",
+                urlopen_fn=recitation,
+            )
+        message = str(raised.exception)
+        self.assertIn("recitation filter blocked this batch", message)
+        self.assertIn("not a blank page", message)
+        self.assertNotIn("finish reason", message)
+
     def test_latex_math_includes_wrapping_instruction_in_request(self):
         captured = {}
 

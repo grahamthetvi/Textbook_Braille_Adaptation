@@ -537,6 +537,30 @@ test("empty STOP is the blank-page error", async () => {
   );
 });
 
+test("empty RECITATION explains the filter instead of a finish-reason code", async () => {
+  await assert.rejects(
+    () =>
+      transcribeBatch({
+        apiKey: "test-key",
+        startPage: 1,
+        endPage: 6,
+        pdfBytes: new Uint8Array([1]),
+        fetchImpl: async () =>
+          jsonResponse(200, {
+            candidates: [{ finishReason: "RECITATION", content: { parts: [] } }],
+          }),
+      }),
+    (err) => {
+      assert.equal(err.finishReason, "RECITATION");
+      assert.equal(err.recitation, true);
+      assert.match(err.message, /recitation filter blocked this batch/i);
+      assert.match(err.message, /not a blank page/i);
+      assert.equal(err.message.includes("finish reason"), false);
+      return true;
+    }
+  );
+});
+
 test("empty MAX_TOKENS is not treated as a blank page", async () => {
   await assert.rejects(
     () =>

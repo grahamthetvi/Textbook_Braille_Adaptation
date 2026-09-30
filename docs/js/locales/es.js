@@ -161,7 +161,7 @@ export const es = {
   "status.batchProgressEmptyRetry":
     "Lote {index} de {total}: páginas {range}. Reintentando después de que un revisor confirmó texto impreso.",
   "status.recitationFallback":
-    "Filtro de recitación detectado en las páginas {range}. Extrayendo texto con OCR en el navegador…",
+    "Gemini no devolvió texto para las páginas {range} porque su filtro de recitación bloqueó la respuesta. Extrayendo texto con OCR en el navegador…",
   "status.ocrCleaning":
     "Dando formato al texto del OCR en el navegador con {model} para las páginas {range}…",
   "status.ocrExtractingPage":
@@ -259,6 +259,8 @@ export const es = {
   "gemini.unreachable":
     "No se pudo llegar a Gemini. Si esta página no puede llamar a Google, ejecuta python3 scripts/serve_adapter.py y usa esa dirección local, o configura una URL de proxy.",
   "gemini.empty": "Gemini devolvió texto vacío para este lote.",
+  "gemini.recitation":
+    "Gemini no devolvió texto porque su filtro de recitación bloqueó este lote. No escribirá estas páginas. Esto no fue una página en blanco.",
   "gemini.emptyReason":
     "Gemini no devolvió texto (motivo de finalización: {reason}). Este lote no se trató como páginas en blanco.",
   "gemini.failedAfterRetries": "La solicitud a Gemini falló tras los reintentos.",

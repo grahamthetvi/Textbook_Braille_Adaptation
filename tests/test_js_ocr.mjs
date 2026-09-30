@@ -50,7 +50,9 @@ test("emptyOutputError sets finishReason on the error object", () => {
   };
   const err = emptyOutputError(payload);
   assert.equal(err.finishReason, "RECITATION");
-  assert.match(err.message, /RECITATION/);
+  assert.equal(err.recitation, true);
+  assert.match(err.message, /recitation filter blocked this batch/i);
+  assert.match(err.message, /not a blank page/i);
   assert.equal(isRecitationError(err), true);
 });
 

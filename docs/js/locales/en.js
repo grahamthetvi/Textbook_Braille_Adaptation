@@ -160,7 +160,7 @@ export const en = {
   "status.batchProgressEmptyRetry":
     "Batch {index} of {total}: pages {range}. Retrying after a reviewer confirmed printed text.",
   "status.recitationFallback":
-    "Recitation filter detected on pages {range}. Extracting text with in-browser OCR…",
+    "Gemini returned no text for pages {range} because its recitation filter blocked the reply. Extracting text with in-browser OCR…",
   "status.ocrCleaning":
     "Formatting in-browser OCR text with {model} for pages {range}…",
   "status.ocrExtractingPage":
@@ -257,6 +257,8 @@ export const en = {
   "gemini.unreachable":
     "Could not reach Gemini. If this page is blocked from calling Google, run python3 scripts/serve_adapter.py and use that local address, or set a proxy URL.",
   "gemini.empty": "Gemini returned empty text for this batch.",
+  "gemini.recitation":
+    "Gemini returned no text because its recitation filter blocked this batch. It will not write out these pages. This was not a blank page.",
   "gemini.emptyReason":
     "Gemini returned no text (finish reason: {reason}). This batch was not treated as blank pages.",
   "gemini.failedAfterRetries": "Gemini request failed after retries.",

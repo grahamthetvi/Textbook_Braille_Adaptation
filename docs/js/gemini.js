@@ -105,6 +105,12 @@ export function emptyOutputError(payload) {
   if (BLANK_FINISH_REASONS.has(reason)) {
     return geminiError(t("gemini.empty"));
   }
+  if (reason.toUpperCase() === "RECITATION") {
+    const err = geminiError(t("gemini.recitation"));
+    err.finishReason = "RECITATION";
+    err.recitation = true;
+    return err;
+  }
   const err = geminiError(t("gemini.emptyReason", { reason }));
   err.finishReason = reason;
   return err;

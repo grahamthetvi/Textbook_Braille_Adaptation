@@ -321,6 +321,11 @@ def transcribe_pdf_bytes(
         if not text:
             candidates = payload.get("candidates") or [{}]
             reason = candidates[0].get("finishReason") or ""
+            if str(reason).upper() == "RECITATION":
+                raise RuntimeError(
+                    "Gemini returned no text because its recitation filter blocked this batch. "
+                    "It will not write out these pages. This was not a blank page."
+                )
             if reason and reason not in ("STOP", "FINISH_REASON_UNSPECIFIED"):
                 raise RuntimeError(
                     f"Gemini returned no text (finish reason: {reason}). This batch was not treated as blank pages."

@@ -160,7 +160,7 @@ export const ar = {
   "status.batchProgressEmptyRetry":
     "الدفعة {index} من {total}: الصفحات {range}. إعادة المحاولة بعد أن أكد مراجع وجود نص مطبوع.",
   "status.recitationFallback":
-    "تم اكتشاف عامل تصفية التلاوة في الصفحات {range}. جارٍ استخراج النص باستخدام التعرف البصري على الحروف داخل المتصفح…",
+    "لم يُرجع Gemini نصًا للصفحات {range} لأن عامل تصفية التلاوة حظر الرد. جارٍ استخراج النص باستخدام التعرف البصري على الحروف داخل المتصفح…",
   "status.ocrCleaning":
     "جارٍ تنسيق نص التعرف البصري داخل المتصفح باستخدام {model} للصفحات {range}…",
   "status.ocrExtractingPage":
@@ -257,6 +257,8 @@ export const ar = {
   "gemini.unreachable":
     "تعذّر الوصول إلى Gemini. إذا كانت هذه الصفحة محظورة من استدعاء Google، شغّل python3 scripts/serve_adapter.py واستخدم ذلك العنوان المحلي، أو عيّن عنوان وكيل.",
   "gemini.empty": "أعاد Gemini نصًا فارغًا لهذه الدفعة.",
+  "gemini.recitation":
+    "لم يُرجع Gemini نصًا لأن عامل تصفية التلاوة حظر هذه الدفعة. لن يكتب هذه الصفحات. لم تكن هذه صفحة فارغة.",
   "gemini.emptyReason":
     "أعاد Gemini نصًا فارغًا (سبب الإنهاء: {reason}). لم تُعامل هذه الدفعة كصفحات فارغة.",
   "gemini.failedAfterRetries": "فشل طلب Gemini بعد إعادة المحاولات.",
