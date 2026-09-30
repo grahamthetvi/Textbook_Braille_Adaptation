@@ -46,6 +46,7 @@ import {
   pagePreviewFileName,
   skippedBlankMarkdown,
 } from "./blank-pages.js";
+import { isRecitationError, extractBatchOcrText } from "./ocr.js";
 
 const LEGACY_SESSION_KEY = "textbook-adapter-api-key";
 const STRAIGHTEN_KEY = "textbook-adapter-straighten";
@@ -815,6 +816,9 @@ function resetBatchesFromRanges(ranges) {
     skippedBlank: false,
     emptyRetry: false,
     headings: [],
+    ocrAttempted: false,
+    ocrText: "",
+    ocrMethod: "",
   }));
   syncHeadingMap();
 }
@@ -895,6 +899,9 @@ function mergeSplitBatches(split) {
       skippedBlank: Boolean(previous?.skippedBlank),
       emptyRetry: Boolean(previous?.emptyRetry),
       headings: previous?.headings || [],
+      ocrAttempted: Boolean(previous?.ocrAttempted),
+      ocrText: previous?.ocrText || "",
+      ocrMethod: previous?.ocrMethod || "",
     };
   });
   syncHeadingMap();
@@ -1040,6 +1047,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
             startPage: batch.startPage,
             endPage: batch.endPage,
             pdfBytes: batch.bytes,
+            ocrText: batch.ocrText || "",
             proxyUrl: els.proxyUrl.value.trim(),
             signal: state.abortController.signal,
             latexMath,
@@ -1097,6 +1105,36 @@ async function runAdaptation({ retryOnly = null } = {}) {
           syncHeadingMap();
           break;
         } catch (err) {
+          if (isRecitationError(err) && !batch.ocrAttempted) {
+            batch.ocrAttempted = true;
+            setStatus("status.recitationFallback", { range: pageRange });
+            render();
+            try {
+              const ocrResult = await extractBatchOcrText(batch.bytes, {
+                startPage: batch.startPage,
+                endPage: batch.endPage,
+                onProgress(statusKey, params) {
+                  setStatus(statusKey, params);
+                },
+              });
+              if (!ocrResult?.text?.trim()) {
+                throw new Error(t("ocr.noTextExtracted", { range: pageRange }));
+              }
+              batch.ocrText = ocrResult.text;
+              batch.ocrMethod = ocrResult.method;
+              setStatus("status.ocrCleaning", { range: pageRange, model });
+              render();
+              continue;
+            } catch (ocrErr) {
+              const outcome = applyTranscriptionError(batch, ocrErr);
+              batch.status = outcome.batchStatus;
+              batch.error = outcome.error;
+              setAlert("alert.raw", { raw: outcome.alertMessage });
+              setStatus("status.raw", { raw: outcome.statusMessage });
+              render();
+              return;
+            }
+          }
           if (isBlankBatchError(err)) {
             pauseForBlankReview(batch, pageRange);
             return;
@@ -1165,6 +1203,9 @@ function retryBatch(batch) {
   batch.clarifyHistory = [];
   batch.locale = "";
   batch.skippedBlank = false;
+  batch.ocrAttempted = false;
+  batch.ocrText = "";
+  batch.ocrMethod = "";
   hideBlankReview();
   render();
   runAdaptation({ retryOnly: batch });

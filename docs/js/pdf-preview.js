@@ -1,6 +1,6 @@
 /** Rasterize PDF pages with pdf.js for on-screen review and Ollama vision. */
 
-function requirePdfJs() {
+export function requirePdfJs() {
   const lib = window.pdfjsLib;
   if (!lib?.getDocument) {
     throw new Error("pdf.js failed to load. Check docs/vendor/pdf.min.js.");

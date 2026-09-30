@@ -42,6 +42,8 @@ MIME_TYPES = {
     ".ico": "image/x-icon",
     ".woff2": "font/woff2",
     ".map": "application/json",
+    ".wasm": "application/wasm",
+    ".gz": "application/gzip",
 }
 
 CORS_ALLOW_HEADERS = (

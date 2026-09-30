@@ -12,6 +12,7 @@ import { DEFAULT_OLLAMA_URL, normalizeEffort } from "./models.js";
 import { renderPdfPagesToPngBase64 } from "./pdf-preview.js";
 import {
   buildInterpretationPrompt,
+  buildOcrCleanupPrompt,
   buildStyleRules,
   formatClarifyFollowUp,
   formatClarifyModelTurn,
@@ -57,7 +58,8 @@ export function describeOllamaError(payload, status, options = {}) {
 export function buildChatMessages({
   startPage,
   endPage,
-  images,
+  images = [],
+  ocrText = "",
   latexMath = false,
   clarifyHistory = [],
   locale = "en",
@@ -65,13 +67,19 @@ export function buildChatMessages({
   headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
+  const userContent = ocrText
+    ? buildOcrCleanupPrompt(pageRange, ocrText, { latexMath, locale, headingContext })
+    : buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext });
+  const userMessage = {
+    role: "user",
+    content: userContent,
+  };
+  if (images && images.length) {
+    userMessage.images = images;
+  }
   const messages = [
     { role: "system", content: buildStyleRules(latexMath, { locale }) },
-    {
-      role: "user",
-      content: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }),
-      images,
-    },
+    userMessage,
   ];
   for (const turn of clarifyHistory || []) {
     const turnLocale = turn.locale || locale;
@@ -139,7 +147,8 @@ async function chatOnce({
   ollamaUrl,
   startPage,
   endPage,
-  images,
+  images = [],
+  ocrText = "",
   signal,
   maxRetries,
   onRetry,
@@ -159,6 +168,7 @@ async function chatOnce({
       startPage,
       endPage,
       images,
+      ocrText,
       latexMath,
       clarifyHistory,
       locale,
@@ -198,6 +208,7 @@ export async function transcribeBatch({
   startPage,
   endPage,
   pdfBytes,
+  ocrText = "",
   signal,
   maxRetries = RETRYABLE_MAX_RETRIES,
   onRetry,
@@ -210,6 +221,28 @@ export async function transcribeBatch({
   headingContext = "",
   rasterizePages = renderPdfPagesToPngBase64,
 }) {
+  if (ocrText) {
+    return chatOnce({
+      model,
+      effort,
+      ollamaUrl,
+      startPage,
+      endPage,
+      images: [],
+      ocrText,
+      signal,
+      maxRetries,
+      onRetry,
+      fetchImpl,
+      sleepFn,
+      latexMath,
+      clarifyHistory,
+      locale,
+      emptyRetry,
+      headingContext,
+    });
+  }
+
   const images = await rasterizePages(pdfBytes, { scale: 2 });
   if (!images.length) {
     throw requestError(t("ollama.noPages"));

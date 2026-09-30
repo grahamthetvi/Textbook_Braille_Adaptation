@@ -190,6 +190,37 @@ export function pageRangeLabel(startPage, endPage) {
   return `${pad(startPage)}-${pad(endPage)}`;
 }
 
+export function buildOcrCleanupPrompt(pageRange, ocrText, options = {}) {
+  const latexMath = Boolean(options.latexMath);
+  const mathLine = latexMath ? LATEX_MATH_INSTRUCTION : PLAIN_MATH_INSTRUCTION;
+  const lang = resolveOutputLanguage(options.locale);
+  const language = languageInstruction(options.locale);
+  const languageBlock = language ? `\n${language}\n` : "\n";
+  const headingContext = String(options.headingContext || "").trim();
+  const headingBlock = headingContext ? `\n${headingContext}\n` : "";
+  const rawText = String(ocrText || "").trim();
+
+  return `The following raw text was extracted by optical character recognition (OCR) from textbook pages ${pageRange}.
+Clean up, format, and structure this text into screen-reader-accessible Markdown. Do not output braille, contractions, or braille ASCII. Transcribe faithfully. Do not change lesson content.
+
+Follow the system instruction:
+- The OCR text may contain broken line breaks, scanning artifacts, merged or split words, OCR character misreads, and out-of-order running headers or footers.
+- Strip running headers, footers, and lone page numbers.
+- Rejoin line-break hyphens: "mod-" plus next-line "ify" becomes "modify". Keep real hyphens such as "Joyner-Kersee".
+- Fix obvious OCR character recognition errors based on lesson context.
+- If a word is unreadable, write ${lang.unclearToken}. Never guess or invent words that alter lesson content.
+- Preserve italic, bold, and underlined print as _italics_, __bold__, and <u>underlined</u>. Do not use asterisk for emphasis.
+- Keep titles, Tip/Note/FYI/Directions labels, example blocks, and numbered practice items.
+- Structure with paragraphs, bullet lists, numbered lists, tables, and blank lines. Do not use markdown hash headings.
+- After a complete transcription, append a HEADINGS trailer listing level|title for every heading on these pages. Keep the HEADINGS: marker in English.
+${languageBlock}${mathLine}${headingBlock}
+Output markdown or plain text only. No preamble, no code fences.
+
+--- RAW OCR TEXT (pages ${pageRange}) ---
+${rawText}
+--- END RAW OCR TEXT ---`;
+}
+
 export function formatClarifyModelTurn(turn = {}, options = {}) {
   const question = String(turn.question || "").trim();
   const draft = String(turn.draft || "").trim();

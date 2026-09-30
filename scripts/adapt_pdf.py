@@ -319,6 +319,12 @@ def transcribe_pdf_bytes(
             break
         text = _strip_fences(_extract_text(payload))
         if not text:
+            candidates = payload.get("candidates") or [{}]
+            reason = candidates[0].get("finishReason") or ""
+            if reason and reason not in ("STOP", "FINISH_REASON_UNSPECIFIED"):
+                raise RuntimeError(
+                    f"Gemini returned no text (finish reason: {reason}). This batch was not treated as blank pages."
+                )
             raise RuntimeError("Gemini returned empty text for this batch.")
         question = parse_clarify(text)
         if question is not None:

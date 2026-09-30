@@ -159,6 +159,12 @@ export const en = {
   "status.batchProgress": "Batch {index} of {total}: pages {range}",
   "status.batchProgressEmptyRetry":
     "Batch {index} of {total}: pages {range}. Retrying after a reviewer confirmed printed text.",
+  "status.recitationFallback":
+    "Recitation filter detected on pages {range}. Extracting text with in-browser OCR…",
+  "status.ocrCleaning":
+    "Formatting in-browser OCR text with {model} for pages {range}…",
+  "status.ocrExtractingPage":
+    "Running in-browser OCR on page {page} of pages {range}…",
   "status.batchRetry": "Batch {index} of {total}. {message}",
   "status.pausedClarify":
     "Paused on pages {range}. Gemini needs a clarification before that batch can finish.",
@@ -287,6 +293,11 @@ export const en = {
   "ollama.noPages": "Could not rasterize PDF pages for Ollama.",
   "ollama.refreshFailed":
     "Could not list Ollama models. Confirm the local adapter is running and a vision model is pulled.",
+
+  "ocr.noTextExtracted":
+    "In-browser OCR could not extract readable text from pages {range}.",
+  "ocr.failed":
+    "In-browser OCR failed on pages {range}: {error}",
 
   "runControl.remainingNotSent": "Remaining batches were not sent because of this failure.",
   "runControl.cancelled": "Cancelled. Completed batches are still available to download.",

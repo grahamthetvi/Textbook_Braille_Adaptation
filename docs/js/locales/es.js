@@ -160,6 +160,12 @@ export const es = {
   "status.batchProgress": "Lote {index} de {total}: páginas {range}",
   "status.batchProgressEmptyRetry":
     "Lote {index} de {total}: páginas {range}. Reintentando después de que un revisor confirmó texto impreso.",
+  "status.recitationFallback":
+    "Filtro de recitación detectado en las páginas {range}. Extrayendo texto con OCR en el navegador…",
+  "status.ocrCleaning":
+    "Dando formato al texto del OCR en el navegador con {model} para las páginas {range}…",
+  "status.ocrExtractingPage":
+    "Ejecutando OCR en el navegador en la página {page} de las páginas {range}…",
   "status.batchRetry": "Lote {index} de {total}. {message}",
   "status.pausedClarify":
     "En pausa en las páginas {range}. Gemini necesita una aclaración antes de poder terminar ese lote.",
@@ -289,6 +295,11 @@ export const es = {
   "ollama.noPages": "No se pudieron rasterizar las páginas del PDF para Ollama.",
   "ollama.refreshFailed":
     "No se pudieron listar los modelos de Ollama. Confirma que el adaptador local está en marcha y que hay un modelo de visión descargado.",
+
+  "ocr.noTextExtracted":
+    "El OCR en el navegador no pudo extraer texto legible de las páginas {range}.",
+  "ocr.failed":
+    "El OCR en el navegador falló en las páginas {range}: {error}",
 
   "runControl.remainingNotSent": "Los lotes restantes no se enviaron por este fallo.",
   "runControl.cancelled": "Cancelado. Los lotes completados siguen disponibles para descargar.",
