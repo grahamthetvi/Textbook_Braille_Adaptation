@@ -82,7 +82,7 @@ https://grahamthetvi.github.io/Textbook_Braille_Adaptation/
 5. Adapt book.
 6. If a clarification panel appears, answer the question and continue that batch.
 7. If a blank-output panel appears, compare the original pages, then skip or retry that batch.
-8. If an automated model filter flags text as recitation, the adapter automatically extracts the page text in the browser and re-prompts the model to format the extracted OCR text.
+8. If an automated model filter flags text as recitation, the adapter extracts the page text in the browser and asks the model to format that text. Raster OCR uses Tesseract page segmentation mode 3 at 300 DPI. A garbled embedded text layer is skipped so the page image is read instead.
 9. Download a Word document, combined markdown, or a zip of per-batch files.
 
 ### Enable GitHub Pages
