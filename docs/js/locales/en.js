@@ -179,6 +179,13 @@ export const en = {
   "status.finished":
     "Finished {done} of {total} batches. You can download the accessible markdown.",
   "status.stopped": "Adaptation stopped.",
+  "status.recovered":
+    "Restored {count} finished batches for {fileName} from this browser. Drop the same PDF to continue the rest, or download to remove the saved copy.",
+  "status.restoredIntoPlan":
+    "Restored {count} finished batches from this browser. {pending} batches are still pending.",
+  "status.downloadedCleared":
+    "Download started. Removed this text's saved copy from the browser.",
+  "status.recoveryDiscarded": "Removed the saved copy of {fileName} from this browser.",
 
   "errors.heading": "Failed batches",
   "errors.hint":
@@ -189,10 +196,21 @@ export const en = {
   "errors.retry": "Retry",
 
   "download.heading": "Download",
-  "download.hint": "Downloads include completed batches only, even if some rows still need a retry.",
+  "download.hint":
+    "Downloads include completed batches only, even if some rows still need a retry. Downloading deletes this text's saved copy from the browser.",
   "download.docx": "Download Word document",
   "download.md": "Download combined markdown",
   "download.zip": "Download zip",
+
+  "recovery.heading": "Saved in this browser",
+  "recovery.hint":
+    "Finished pages stay in this browser so an interrupted run can be restored. Downloading a text deletes that text's saved copy.",
+  "recovery.listLabel": "Saved texts",
+  "recovery.summary": "{fileName} · {count} finished batches",
+  "recovery.restore": "Restore",
+  "recovery.discard": "Discard",
+  "recovery.saveFailed":
+    "This browser could not save the finished pages. Download them before leaving this page.",
 
   "batch.noBatches": "No batches planned yet.",
   "batch.pages": "pages {range}",

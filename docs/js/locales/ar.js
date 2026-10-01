@@ -179,6 +179,12 @@ export const ar = {
   "status.finished":
     "انتهت {done} من {total} دفعات. يمكنك تنزيل الماركداون الميسّر.",
   "status.stopped": "توقف التكييف.",
+  "status.recovered":
+    "استُعيدت {count} دفعات منتهية من {fileName} من هذا المتصفح. أفلت ملف PDF نفسه لمتابعة الباقي، أو نزّل النص لإزالة النسخة المحفوظة.",
+  "status.restoredIntoPlan":
+    "استُعيدت {count} دفعات منتهية من هذا المتصفح. {pending} دفعات لا تزال معلّقة.",
+  "status.downloadedCleared": "بدأ التنزيل. أُزيلت النسخة المحفوظة لهذا النص من المتصفح.",
+  "status.recoveryDiscarded": "أُزيلت النسخة المحفوظة لـ {fileName} من هذا المتصفح.",
 
   "errors.heading": "دفعات فاشلة",
   "errors.hint":
@@ -189,10 +195,21 @@ export const ar = {
   "errors.retry": "إعادة المحاولة",
 
   "download.heading": "تنزيل",
-  "download.hint": "تشمل التنزيلات الدفعات المكتملة فقط، حتى إذا كانت بعض الصفوف لا تزال بحاجة إلى إعادة محاولة.",
+  "download.hint":
+    "تشمل التنزيلات الدفعات المكتملة فقط، حتى إذا كانت بعض الصفوف لا تزال بحاجة إلى إعادة محاولة. التنزيل يحذف النسخة المحفوظة لهذا النص من المتصفح.",
   "download.docx": "تنزيل مستند Word",
   "download.md": "تنزيل الماركداون المدمج",
   "download.zip": "تنزيل zip",
+
+  "recovery.heading": "محفوظ في هذا المتصفح",
+  "recovery.hint":
+    "تبقى الصفحات المنتهية في هذا المتصفح حتى يمكن استعادة تشغيل انقطع. تنزيل النص يحذف النسخة المحفوظة لذلك النص.",
+  "recovery.listLabel": "النصوص المحفوظة",
+  "recovery.summary": "{fileName} · {count} دفعات منتهية",
+  "recovery.restore": "استعادة",
+  "recovery.discard": "تجاهل",
+  "recovery.saveFailed":
+    "تعذر على هذا المتصفح حفظ الصفحات المنتهية. نزّلها قبل مغادرة هذه الصفحة.",
 
   "batch.noBatches": "لم تُخطَّط أي دفعات بعد.",
   "batch.pages": "الصفحات {range}",

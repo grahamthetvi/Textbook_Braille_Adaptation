@@ -360,6 +360,32 @@ textarea {
   margin-bottom: 0;
 }
 
+.recovery-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.recovery-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.15rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+#recovery-warning {
+  color: var(--error);
+}
+
 button {
   padding: 0.5rem 0.95rem;
   border-radius: 2px;
@@ -577,7 +603,8 @@ progress {
   .field-row,
   .actions,
   .batch-row,
-  .error-item {
+  .error-item,
+  .recovery-item {
     display: flex;
     flex-direction: column;
     align-items: stretch;
