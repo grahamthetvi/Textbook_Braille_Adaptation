@@ -28,6 +28,16 @@ import {
   parseHeadingsResponse,
 } from "./headings.js";
 import { downloadCombined, downloadDocx, downloadZip } from "./download.js";
+import {
+  applyRecoveryToBatches,
+  batchesFromRecovery,
+  clearDownloadedText,
+  listRecoveries,
+  loadRecovery,
+  rememberFinishedBatch,
+  removeRecovery,
+  textKey,
+} from "./recovery.js";
 import { planBatches, padPage } from "./batches.js";
 import { applyTranscriptionError, formatPageRange, formatRetryingStatus } from "./run-control.js";
 import { formatIssueLine } from "./issues.js";
@@ -84,6 +94,7 @@ const state = {
   uiStatus: { key: "status.loadPdf", vars: {} },
   uiAlert: { key: "", vars: {} },
   provider: "gemini",
+  recoveryWarning: false,
 };
 
 function cacheElements() {
@@ -126,6 +137,9 @@ function cacheElements() {
   els.downloadDocxBtn = document.getElementById("download-docx-btn");
   els.downloadMdBtn = document.getElementById("download-md-btn");
   els.downloadZipBtn = document.getElementById("download-zip-btn");
+  els.recoverySection = document.getElementById("recovery-section");
+  els.recoveryList = document.getElementById("recovery-list");
+  els.recoveryWarning = document.getElementById("recovery-warning");
   els.latexMath = document.getElementById("latex-math");
   els.straighten = document.getElementById("straighten-pages");
   els.clarifySection = document.getElementById("clarify-section");
@@ -223,6 +237,85 @@ function refreshAlert() {
 
 function completedBatches() {
   return state.batches.filter((batch) => batch.status === "done" && batch.markdown);
+}
+
+function recoveryStorage() {
+  try {
+    if (typeof localStorage === "undefined" || !localStorage) {
+      return null;
+    }
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function currentTextKey() {
+  return textKey(state.fileName || "textbook.pdf", state.pageCount);
+}
+
+function fillBatchIssues(batches) {
+  const latexMath = Boolean(els.latexMath?.checked);
+  for (const batch of batches) {
+    if (batch.status !== "done" || !batch.markdown) {
+      batch.issues = batch.issues || [];
+      continue;
+    }
+    const pageRange = formatPageRange(batch.startPage, batch.endPage);
+    batch.issues = validateMarkdown(batch.markdown, `pages-${pageRange}`, { latexMath });
+  }
+}
+
+function persistFinishedBatch(batch) {
+  const storage = recoveryStorage();
+  if (!storage) {
+    state.recoveryWarning = true;
+    return;
+  }
+  try {
+    const saved = rememberFinishedBatch(storage, {
+      fileName: state.fileName || "textbook.pdf",
+      pageCount: state.pageCount,
+      batch,
+    });
+    if (!saved && batch?.status === "done" && String(batch.markdown || "").trim()) {
+      state.recoveryWarning = true;
+    }
+  } catch {
+    state.recoveryWarning = true;
+  }
+}
+
+function adoptSavedBatches() {
+  const storage = recoveryStorage();
+  if (!storage || !state.fileName) {
+    return 0;
+  }
+  const record = loadRecovery(storage, currentTextKey());
+  if (!record) {
+    return 0;
+  }
+  const applied = applyRecoveryToBatches(record, state.batches);
+  if (applied) {
+    fillBatchIssues(state.batches);
+    syncHeadingMap();
+  }
+  return applied;
+}
+
+function savedTextIsLoaded(record) {
+  if (!record || currentTextKey() !== record.id) {
+    return false;
+  }
+  return record.batches.every((saved) =>
+    state.batches.some(
+      (batch) =>
+        batch.status === "done" &&
+        batch.startPage === saved.startPage &&
+        batch.endPage === saved.endPage &&
+        batch.markdown === saved.markdown
+    )
+  );
 }
 
 function syncHeadingMap() {
@@ -763,6 +856,56 @@ function renderDownloads() {
   els.downloadZipBtn.disabled = !ready;
 }
 
+function renderRecovery() {
+  if (!els.recoverySection || !els.recoveryList) {
+    return;
+  }
+  const storage = recoveryStorage();
+  const saved = storage ? listRecoveries(storage) : [];
+  const visible = saved.filter((record) => !savedTextIsLoaded(record));
+  els.recoveryList.replaceChildren();
+  els.recoveryList.hidden = visible.length === 0;
+  els.recoverySection.hidden = visible.length === 0 && !state.recoveryWarning;
+  if (els.recoveryWarning) {
+    els.recoveryWarning.hidden = !state.recoveryWarning;
+    els.recoveryWarning.textContent = state.recoveryWarning ? t("recovery.saveFailed") : "";
+  }
+  for (const record of visible) {
+    const item = document.createElement("li");
+    item.className = "recovery-item";
+
+    const summary = document.createElement("span");
+    summary.textContent = t(
+      record.batches.length === 1 ? "recovery.summaryOne" : "recovery.summary",
+      {
+        fileName: record.fileName,
+        count: record.batches.length,
+      }
+    );
+
+    const actions = document.createElement("div");
+    actions.className = "recovery-actions";
+
+    const restore = document.createElement("button");
+    restore.type = "button";
+    restore.dataset.recoveryAction = "restore";
+    restore.dataset.recoveryId = record.id;
+    restore.textContent = t("recovery.restore");
+    restore.disabled = state.running;
+
+    const discard = document.createElement("button");
+    discard.type = "button";
+    discard.dataset.recoveryAction = "discard";
+    discard.dataset.recoveryId = record.id;
+    discard.textContent = t("recovery.discard");
+    discard.disabled = state.running;
+
+    actions.append(restore, discard);
+    item.append(summary, actions);
+    els.recoveryList.append(item);
+  }
+}
+
 function render() {
   if (state.fileName) {
     els.fileMeta.textContent =
@@ -778,6 +921,7 @@ function render() {
   renderClarify();
   renderErrors();
   renderDownloads();
+  renderRecovery();
 }
 
 function refreshUi() {
@@ -831,9 +975,15 @@ function planFromLoadedPdf() {
   const preferred = getPreferredBatchSize();
   els.batchSize.value = String(preferred);
   resetBatchesFromRanges(planBatches(state.pageCount, preferred));
+  const restored = adoptSavedBatches();
   const count = state.batches.length;
+  const pending = state.batches.filter((batch) => batch.status === "pending").length;
   setAlert("");
-  if (count === 1) {
+  if (restored && pending) {
+    setStatus("status.restoredIntoPlan", { count: restored, pending });
+  } else if (restored) {
+    setStatus("status.recovered", { count: restored, fileName: state.fileName });
+  } else if (count === 1) {
     setStatus("status.plannedOne", { count: state.pageCount });
   } else {
     setStatus("status.plannedMany", { batches: count, count: state.pageCount });
@@ -1102,6 +1252,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
           batch.clarifyDraft = "";
           batch.clarifyMarker = "";
           batch.skippedBlank = false;
+          persistFinishedBatch(batch);
           syncHeadingMap();
           break;
         } catch (err) {
@@ -1228,6 +1379,7 @@ function skipBlankBatch() {
   batch.status = "done";
   batch.error = "";
   batch.skippedBlank = true;
+  persistFinishedBatch(batch);
   syncHeadingMap();
   hideBlankReview();
   setAlert("");
@@ -1387,24 +1539,141 @@ function bindEvents() {
   });
   els.dropZone.addEventListener("drop", onDrop);
 
-  els.downloadDocxBtn.addEventListener("click", async () => {
-    const results = completedBatches();
-    if (results.length) {
-      await downloadDocx(results, state.fileName || "textbook.pdf");
-    }
+  els.downloadDocxBtn.addEventListener("click", () => {
+    downloadAndForget("docx");
   });
   els.downloadMdBtn.addEventListener("click", () => {
-    const results = completedBatches();
-    if (results.length) {
-      downloadCombined(results, state.fileName || "textbook.pdf");
+    downloadAndForget("md");
+  });
+  els.downloadZipBtn.addEventListener("click", () => {
+    downloadAndForget("zip");
+  });
+  els.recoveryList?.addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button || state.running) {
+      return;
+    }
+    const id = button.dataset.recoveryId;
+    if (!id) {
+      return;
+    }
+    if (button.dataset.recoveryAction === "restore") {
+      restoreSavedText(id);
+    } else if (button.dataset.recoveryAction === "discard") {
+      discardSavedText(id);
     }
   });
-  els.downloadZipBtn.addEventListener("click", async () => {
-    const results = completedBatches();
-    if (results.length) {
-      await downloadZip(results, state.fileName || "textbook.pdf");
+}
+
+function restoreSavedText(id) {
+  if (state.running) {
+    return;
+  }
+  const storage = recoveryStorage();
+  const record = storage ? loadRecovery(storage, id) : null;
+  if (!record) {
+    render();
+    return;
+  }
+  const sameLoadedPdf = Boolean(state.sourceBytes) && currentTextKey() === record.id;
+  if (sameLoadedPdf) {
+    const plan = planBatches(state.pageCount, getPreferredBatchSize());
+    const matchesPlan = record.batches.some((saved) =>
+      plan.some((range) => range.startPage === saved.startPage && range.endPage === saved.endPage)
+    );
+    if (matchesPlan) {
+      planFromLoadedPdf();
+      return;
     }
-  });
+  }
+  state.fileName = record.fileName;
+  state.pageCount = record.pageCount;
+  if (!sameLoadedPdf) {
+    state.sourceBytes = null;
+  }
+  state.lastSplitPreferred = null;
+  state.batches = batchesFromRecovery(record);
+  fillBatchIssues(state.batches);
+  syncHeadingMap();
+  hideBlankReview();
+  setAlert("");
+  setStatus("status.recovered", { count: record.batches.length, fileName: record.fileName });
+  render();
+}
+
+function discardSavedText(id) {
+  if (state.running) {
+    return;
+  }
+  const storage = recoveryStorage();
+  if (!storage) {
+    return;
+  }
+  const record = loadRecovery(storage, id);
+  if (!record || !removeRecovery(storage, id)) {
+    render();
+    return;
+  }
+  setStatus("status.recoveryDiscarded", { fileName: record.fileName });
+  render();
+}
+
+async function downloadAndForget(kind) {
+  const results = completedBatches();
+  if (!results.length || state.running) {
+    return;
+  }
+  const sourceName = state.fileName || "textbook.pdf";
+  try {
+    if (kind === "docx") {
+      await downloadDocx(results, sourceName);
+    } else if (kind === "zip") {
+      await downloadZip(results, sourceName);
+    } else if (kind === "md") {
+      downloadCombined(results, sourceName);
+    } else {
+      return;
+    }
+  } catch (err) {
+    setAlert("alert.raw", { raw: err?.message || t("recovery.saveFailed") });
+    return;
+  }
+  const storage = recoveryStorage();
+  let cleared = false;
+  if (storage) {
+    try {
+      cleared = clearDownloadedText(storage, {
+        fileName: sourceName,
+        pageCount: state.pageCount,
+        batches: results,
+      });
+    } catch {
+      cleared = false;
+    }
+  }
+  if (cleared) {
+    state.recoveryWarning = false;
+    setStatus("status.downloadedCleared");
+  }
+  render();
+}
+
+function restoreFinishedPages() {
+  const storage = recoveryStorage();
+  if (!storage || state.batches.length || state.sourceBytes) {
+    renderRecovery();
+    return;
+  }
+  let saved = [];
+  try {
+    saved = listRecoveries(storage);
+  } catch {
+    return;
+  }
+  if (!saved.length) {
+    return;
+  }
+  restoreSavedText(saved[0].id);
 }
 
 cacheElements();
@@ -1420,3 +1689,4 @@ setLocale(detectLocale());
 refreshUi();
 restoreStraighten();
 restoreApiKey();
+restoreFinishedPages();

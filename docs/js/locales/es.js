@@ -180,6 +180,13 @@ export const es = {
   "status.finished":
     "Se terminaron {done} de {total} lotes. Puedes descargar el markdown accesible.",
   "status.stopped": "La adaptación se detuvo.",
+  "status.recovered":
+    "Se restauraron {count} lotes terminados de {fileName} desde este navegador. Suelta el mismo PDF para continuar el resto, o descarga para eliminar la copia guardada.",
+  "status.restoredIntoPlan":
+    "Se restauraron {count} lotes terminados desde este navegador. {pending} lotes siguen pendientes.",
+  "status.downloadedCleared":
+    "La descarga comenzó. Se eliminó la copia guardada de este texto en el navegador.",
+  "status.recoveryDiscarded": "Se eliminó la copia guardada de {fileName} de este navegador.",
 
   "errors.heading": "Lotes fallidos",
   "errors.hint":
@@ -191,10 +198,21 @@ export const es = {
 
   "download.heading": "Descargar",
   "download.hint":
-    "Las descargas incluyen solo los lotes completados, aunque algunas filas todavía necesiten un reintento.",
+    "Las descargas incluyen solo los lotes completados, aunque algunas filas todavía necesiten un reintento. Descargar elimina la copia guardada de este texto en el navegador.",
   "download.docx": "Descargar documento de Word",
   "download.md": "Descargar markdown combinado",
   "download.zip": "Descargar zip",
+
+  "recovery.heading": "Guardado en este navegador",
+  "recovery.hint":
+    "Las páginas terminadas permanecen en este navegador para poder restaurar una ejecución interrumpida. Descargar un texto elimina la copia guardada de ese texto.",
+  "recovery.listLabel": "Textos guardados",
+  "recovery.summaryOne": "{fileName} · 1 lote terminado",
+  "recovery.summary": "{fileName} · {count} lotes terminados",
+  "recovery.restore": "Restaurar",
+  "recovery.discard": "Descartar",
+  "recovery.saveFailed":
+    "Este navegador no pudo guardar las páginas terminadas. Descárgalas antes de salir de esta página.",
 
   "batch.noBatches": "Todavía no hay lotes planificados.",
   "batch.pages": "páginas {range}",
