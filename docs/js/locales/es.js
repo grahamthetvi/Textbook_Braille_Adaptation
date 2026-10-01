@@ -207,6 +207,7 @@ export const es = {
   "recovery.hint":
     "Las páginas terminadas permanecen en este navegador para poder restaurar una ejecución interrumpida. Descargar un texto elimina la copia guardada de ese texto.",
   "recovery.listLabel": "Textos guardados",
+  "recovery.summaryOne": "{fileName} · 1 lote terminado",
   "recovery.summary": "{fileName} · {count} lotes terminados",
   "recovery.restore": "Restaurar",
   "recovery.discard": "Descartar",

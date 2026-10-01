@@ -206,6 +206,7 @@ export const en = {
   "recovery.hint":
     "Finished pages stay in this browser so an interrupted run can be restored. Downloading a text deletes that text's saved copy.",
   "recovery.listLabel": "Saved texts",
+  "recovery.summaryOne": "{fileName} · 1 finished batch",
   "recovery.summary": "{fileName} · {count} finished batches",
   "recovery.restore": "Restore",
   "recovery.discard": "Discard",

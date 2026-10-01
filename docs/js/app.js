@@ -875,10 +875,13 @@ function renderRecovery() {
     item.className = "recovery-item";
 
     const summary = document.createElement("span");
-    summary.textContent = t("recovery.summary", {
-      fileName: record.fileName,
-      count: record.batches.length,
-    });
+    summary.textContent = t(
+      record.batches.length === 1 ? "recovery.summaryOne" : "recovery.summary",
+      {
+        fileName: record.fileName,
+        count: record.batches.length,
+      }
+    );
 
     const actions = document.createElement("div");
     actions.className = "recovery-actions";

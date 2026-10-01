@@ -205,6 +205,7 @@ export const ar = {
   "recovery.hint":
     "تبقى الصفحات المنتهية في هذا المتصفح حتى يمكن استعادة تشغيل انقطع. تنزيل النص يحذف النسخة المحفوظة لذلك النص.",
   "recovery.listLabel": "النصوص المحفوظة",
+  "recovery.summaryOne": "{fileName} · دفعة منتهية واحدة",
   "recovery.summary": "{fileName} · {count} دفعات منتهية",
   "recovery.restore": "استعادة",
   "recovery.discard": "تجاهل",
