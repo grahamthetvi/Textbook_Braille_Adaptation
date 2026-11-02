@@ -151,10 +151,20 @@ export function describeGeminiError(payload, status, options = {}) {
   return message || t("gemini.requestFailed", { status });
 }
 
+function imageInlineParts(images) {
+  return images.map((image) => ({
+    inline_data: {
+      mime_type: image.mime || "image/jpeg",
+      data: bytesToBase64(image.bytes),
+    },
+  }));
+}
+
 export function buildTranscribeContents({
   startPage,
   endPage,
   pdfBytes,
+  images = [],
   ocrText = "",
   latexMath = false,
   clarifyHistory = [],
@@ -163,16 +173,27 @@ export function buildTranscribeContents({
   headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
+  const promptOptions = {
+    latexMath,
+    locale,
+    emptyRetry,
+    headingContext,
+    imageCount: images.length,
+  };
   const userParts = ocrText
     ? [{ text: buildOcrCleanupPrompt(pageRange, ocrText, { latexMath, locale, headingContext }) }]
     : [
-        {
-          inline_data: {
-            mime_type: "application/pdf",
-            data: bytesToBase64(pdfBytes),
-          },
-        },
-        { text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }) },
+        ...(images.length
+          ? imageInlineParts(images)
+          : [
+              {
+                inline_data: {
+                  mime_type: "application/pdf",
+                  data: bytesToBase64(pdfBytes),
+                },
+              },
+            ]),
+        { text: buildInterpretationPrompt(pageRange, promptOptions) },
       ];
   const contents = [
     {
@@ -201,6 +222,7 @@ export async function transcribeBatch({
   startPage,
   endPage,
   pdfBytes,
+  images = [],
   ocrText = "",
   proxyUrl = "",
   signal,
@@ -222,6 +244,7 @@ export async function transcribeBatch({
       startPage,
       endPage,
       pdfBytes,
+      images,
       ocrText,
       latexMath,
       clarifyHistory,

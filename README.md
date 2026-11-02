@@ -1,6 +1,6 @@
 # Textbook Adapter
 
-Turn scanned textbook PDFs into screen-reader-accessible markdown. This app transcribes pages; it does not produce braille. Optional LaTeX wrapping supports a later Nemeth path.
+Turn scanned textbook PDFs, or a group of page pictures, into screen-reader-accessible markdown. This app transcribes pages; it does not produce braille. Optional LaTeX wrapping supports a later Nemeth path.
 
 The primary path is a static web app: choose a model, drop a PDF, split it into 5–8 page batches in the browser, and download markdown. Gemini 3.8 Flash is the default. Claude, OpenAI GPT-5.6, and local Ollama vision models are available from the same page.
 
@@ -25,7 +25,7 @@ Recommended effort (cheaper OCR defaults, marked in the UI):
 2. Create an API key in a Google Cloud project. If Google asks, enable the **Gemini API** (Generative Language API) for that project.
 3. Serve the site (`python3 scripts/serve_adapter.py`) or open the GitHub Pages URL after deploy.
 4. Paste the key. Leave **Model** on Gemini 3.8 Flash and **Effort** on medium (recommended).
-5. Drop a PDF, plan batches, then Adapt book.
+5. Drop a PDF or a group of page pictures, plan batches, then Adapt book. Pictures are one page each and are read in filename order.
 
 The Gemini key stays in the browser session. It is sent only to Google (`generativelanguage.googleapis.com`), or to an optional same-origin Gemini proxy. Vertex AI / Gemini Enterprise OAuth tokens are not supported here.
 
@@ -76,7 +76,7 @@ After you merge to `main` and enable GitHub Pages, the same app is also at:
 https://grahamthetvi.github.io/Textbook_Braille_Adaptation/
 
 1. Paste a provider API key (or choose Ollama with no key). Gemini works from GitHub Pages; Claude, OpenAI, and Ollama need the local server.
-2. Drop a PDF on the page.
+2. Drop a PDF, or a group of page pictures, on the page.
 3. Plan batches (5–8 pages each).
 4. Optionally check **Wrap math in LaTeX (for Nemeth)**.
 5. Adapt book.

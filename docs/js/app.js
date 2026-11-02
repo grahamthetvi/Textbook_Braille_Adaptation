@@ -6,6 +6,8 @@
 import { splitPdfBytes, inspectPdf, extractPagePdfs } from "./pdf-split.js";
 import { renderPageCanvas } from "./pdf-preview.js";
 import { straightenPdfBytes } from "./straighten.js";
+import { classifySourceFiles, sliceImagePages } from "./image-pages.js";
+import { prepareImagePages, straightenImagePages } from "./image-prepare.js";
 import { transcribeBatch } from "./transcribe.js";
 import {
   CUSTOM_MODEL_VALUE,
@@ -56,7 +58,7 @@ import {
   pagePreviewFileName,
   skippedBlankMarkdown,
 } from "./blank-pages.js";
-import { isRecitationError, extractBatchOcrText } from "./ocr.js";
+import { isRecitationError, extractBatchOcrText, extractImageBatchOcrText } from "./ocr.js";
 
 const LEGACY_SESSION_KEY = "textbook-adapter-api-key";
 const STRAIGHTEN_KEY = "textbook-adapter-straighten";
@@ -80,7 +82,9 @@ const els = {};
 const state = {
   fileName: "",
   pageCount: 0,
+  sourceKind: "",
   sourceBytes: null,
+  imagePages: null,
   batches: [],
   headingMap: [],
   running: false,
@@ -763,6 +767,34 @@ async function appendBlankPagePreview(pageNumber, bytes) {
   els.blankPages.append(figure);
 }
 
+function appendBlankImagePreview(pageNumber, image) {
+  const mime = image.mime || "image/jpeg";
+  const url = URL.createObjectURL(new Blob([image.bytes], { type: mime }));
+  state.blankPreviewUrls.push(url);
+
+  const figure = document.createElement("figure");
+  figure.className = "blank-page";
+
+  const caption = document.createElement("figcaption");
+  caption.textContent = t("blank.sourcePage", { page: padPage(pageNumber) });
+
+  const img = document.createElement("img");
+  img.src = url;
+  img.alt = t("blank.scanAria", { page: pageNumber });
+
+  const fallback = document.createElement("p");
+  fallback.className = "blank-page-fallback hint";
+  const link = document.createElement("a");
+  link.href = url;
+  const extension = mime === "image/png" ? "png" : "jpg";
+  link.download = image.name || `source-page-${padPage(pageNumber)}.${extension}`;
+  link.textContent = t("blank.downloadPage", { page: padPage(pageNumber) });
+  fallback.append(link, t("blank.downloadPictureSuffix"));
+
+  figure.append(caption, img, fallback);
+  els.blankPages.append(figure);
+}
+
 async function loadBlankPreviews(batch) {
   const token = ++state.blankPreviewToken;
   revokeBlankPreviews();
@@ -773,9 +805,25 @@ async function loadBlankPreviews(batch) {
   els.blankPages.append(loading);
 
   try {
+    if (batch.imagePages?.length) {
+      if (token !== state.blankPreviewToken) {
+        return;
+      }
+      els.blankPages.replaceChildren();
+      for (let index = 0; index < batch.imagePages.length; index += 1) {
+        if (token !== state.blankPreviewToken) {
+          return;
+        }
+        appendBlankImagePreview(batch.startPage + index, batch.imagePages[index]);
+      }
+      if (!state.running) {
+        queueMicrotask(() => els.blankSkipBtn.focus());
+      }
+      return;
+    }
     const pdfBytes = batch.bytes || state.sourceBytes;
     if (!pdfBytes) {
-      throw new Error(t("blank.pdfGone"));
+      throw new Error(t(state.sourceKind === "images" ? "blank.picturesGone" : "blank.pdfGone"));
     }
     const pages = await extractPagePdfs(pdfBytes, batch.startPage, batch.endPage);
     if (token !== state.blankPreviewToken) {
@@ -906,8 +954,20 @@ function renderRecovery() {
   }
 }
 
+function hasSource() {
+  if (state.sourceKind === "images") {
+    return Boolean(state.imagePages?.length);
+  }
+  return Boolean(state.sourceBytes);
+}
+
 function render() {
-  if (state.fileName) {
+  if (state.sourceKind === "images" && state.pageCount) {
+    els.fileMeta.textContent =
+      state.pageCount === 1
+        ? t("file.onePicture", { fileName: state.fileName })
+        : t("file.pictures", { count: state.pageCount });
+  } else if (state.fileName) {
     els.fileMeta.textContent =
       state.pageCount === 1
         ? t("file.onePage", { fileName: state.fileName })
@@ -968,7 +1028,7 @@ function resetBatchesFromRanges(ranges) {
 }
 
 function planFromLoadedPdf() {
-  if (!state.sourceBytes || !state.pageCount) {
+  if (!hasSource() || !state.pageCount) {
     setAlert("alert.choosePdfFirst");
     return false;
   }
@@ -1004,6 +1064,8 @@ async function loadPdfFile(file) {
 
   try {
     const info = await inspectPdf(file);
+    state.sourceKind = "pdf";
+    state.imagePages = null;
     state.fileName = info.fileName || file.name;
     state.pageCount = info.pageCount;
     state.sourceBytes = info.bytes;
@@ -1022,6 +1084,61 @@ async function loadPdfFile(file) {
       setAlert("alert.couldNotRead");
     }
   }
+}
+
+async function loadImageFiles(files) {
+  try {
+    const pages = await prepareImagePages(files, {
+      onProgress(done, total) {
+        setStatus("status.readingPictures", { done, total });
+      },
+    });
+    if (!pages.length) {
+      setAlert("alert.noPictures");
+      return;
+    }
+    state.sourceKind = "images";
+    state.sourceBytes = null;
+    state.imagePages = pages;
+    state.fileName = pages.length === 1 ? pages[0].name : "pictures";
+    state.pageCount = pages.length;
+    planFromLoadedPdf();
+  } catch (err) {
+    if (err?.pictureName) {
+      setAlert("alert.couldNotReadPicture", { fileName: err.pictureName });
+      return;
+    }
+    if (err?.message) {
+      setAlert("alert.raw", { raw: err.message });
+      return;
+    }
+    setAlert("alert.noPictures");
+  }
+}
+
+async function loadSource(fileList) {
+  const classified = classifySourceFiles(fileList);
+  if (classified.kind === "empty") {
+    setAlert("alert.choosePdf");
+    return;
+  }
+  if (classified.kind === "pdf") {
+    await loadPdfFile(classified.files[0]);
+    return;
+  }
+  if (classified.kind === "images") {
+    await loadImageFiles(classified.files);
+    return;
+  }
+  if (classified.kind === "many-pdfs") {
+    setAlert("alert.manyPdfs");
+    return;
+  }
+  if (classified.kind === "mixed") {
+    setAlert("alert.mixedSource");
+    return;
+  }
+  setAlert("alert.unsupportedFile");
 }
 
 function mergeSplitBatches(split) {
@@ -1057,8 +1174,65 @@ function mergeSplitBatches(split) {
   syncHeadingMap();
 }
 
+function mergeImageBatches(split) {
+  state.batches = split.map((item) => {
+    const previous = state.batches.find(
+      (batch) => batch.startPage === item.startPage && batch.endPage === item.endPage
+    );
+    const inFlight = previous?.status === "running" || previous?.status === "retrying";
+    const status = previous?.status && !inFlight ? previous.status : "pending";
+    return {
+      startPage: item.startPage,
+      endPage: item.endPage,
+      pageCount: item.pageCount,
+      bytes: null,
+      rawBytes: null,
+      imagePages: item.imagePages,
+      rawImagePages: item.imagePages,
+      orientedImagePages: null,
+      status,
+      markdown: previous?.markdown || "",
+      issues: previous?.issues || [],
+      error: previous?.error || "",
+      clarifyQuestion: previous?.clarifyQuestion || "",
+      clarifyDraft: previous?.clarifyDraft || "",
+      clarifyMarker: previous?.clarifyMarker || "",
+      clarifyHistory: previous?.clarifyHistory || [],
+      locale: previous?.locale || "",
+      skippedBlank: Boolean(previous?.skippedBlank),
+      emptyRetry: Boolean(previous?.emptyRetry),
+      headings: previous?.headings || [],
+      ocrAttempted: Boolean(previous?.ocrAttempted),
+      ocrText: previous?.ocrText || "",
+      ocrMethod: previous?.ocrMethod || "",
+    };
+  });
+  syncHeadingMap();
+}
+
 async function ensureBatchBytes() {
   const preferred = getPreferredBatchSize();
+  if (state.sourceKind === "images") {
+    const needsGroup =
+      state.lastSplitPreferred !== preferred ||
+      state.batches.some((batch) => !batch.imagePages?.length);
+    if (!needsGroup) {
+      return;
+    }
+    setStatus("status.groupingPictures");
+    const ranges = planBatches(state.imagePages.length, preferred);
+    const split = ranges.map((range) => ({
+      startPage: range.startPage,
+      endPage: range.endPage,
+      pageCount: range.endPage - range.startPage + 1,
+      imagePages: sliceImagePages(state.imagePages, range.startPage, range.endPage),
+    }));
+    state.pageCount = state.imagePages.length;
+    state.lastSplitPreferred = preferred;
+    mergeImageBatches(split);
+    render();
+    return;
+  }
   const needsSplit =
     state.lastSplitPreferred !== preferred || state.batches.some((batch) => !batch.bytes);
   if (!needsSplit) {
@@ -1072,7 +1246,31 @@ async function ensureBatchBytes() {
   render();
 }
 
+async function prepareBatchImages(batch) {
+  const raw = batch.rawImagePages || batch.imagePages;
+  if (!raw?.length) {
+    return 0;
+  }
+  if (!els.straighten?.checked) {
+    batch.imagePages = raw;
+    return 0;
+  }
+  if (batch.orientedRaw === raw && batch.orientedImagePages) {
+    batch.imagePages = batch.orientedImagePages;
+    return batch.rotatedPages || 0;
+  }
+  const result = await straightenImagePages(raw);
+  batch.orientedRaw = raw;
+  batch.orientedImagePages = result.pages;
+  batch.rotatedPages = result.rotatedPages;
+  batch.imagePages = result.pages;
+  return result.rotatedPages;
+}
+
 async function prepareBatchPdf(batch) {
+  if (batch.rawImagePages || batch.imagePages) {
+    return prepareBatchImages(batch);
+  }
   const raw = batch.rawBytes || batch.bytes;
   if (!raw) {
     return 0;
@@ -1118,7 +1316,7 @@ async function runAdaptation({ retryOnly = null } = {}) {
     (catalogModel === CUSTOM_MODEL_VALUE ? els.customModel : els.model).focus();
     return;
   }
-  if (!state.sourceBytes) {
+  if (!hasSource()) {
     setAlert("alert.needPdf");
     return;
   }
@@ -1196,7 +1394,8 @@ async function runAdaptation({ retryOnly = null } = {}) {
             effort,
             startPage: batch.startPage,
             endPage: batch.endPage,
-            pdfBytes: batch.bytes,
+            pdfBytes: batch.imagePages?.length ? undefined : batch.bytes,
+            images: batch.imagePages || [],
             ocrText: batch.ocrText || "",
             proxyUrl: els.proxyUrl.value.trim(),
             signal: state.abortController.signal,
@@ -1261,13 +1460,16 @@ async function runAdaptation({ retryOnly = null } = {}) {
             setStatus("status.recitationFallback", { range: pageRange });
             render();
             try {
-              const ocrResult = await extractBatchOcrText(batch.bytes, {
+              const ocrOptions = {
                 startPage: batch.startPage,
                 endPage: batch.endPage,
                 onProgress(statusKey, params) {
                   setStatus(statusKey, params);
                 },
-              });
+              };
+              const ocrResult = batch.imagePages?.length
+                ? await extractImageBatchOcrText(batch.imagePages, ocrOptions)
+                : await extractBatchOcrText(batch.bytes, ocrOptions);
               if (!ocrResult?.text?.trim()) {
                 throw new Error(t("ocr.noTextExtracted", { range: pageRange }));
               }
@@ -1456,10 +1658,10 @@ function onDrop(event) {
   event.preventDefault();
   state.dragDepth = 0;
   els.dropZone.classList.remove("is-dragover");
-  const file = event.dataTransfer?.files?.[0];
-  if (file) {
-    els.pdfFile.files = event.dataTransfer.files;
-    loadPdfFile(file);
+  const files = event.dataTransfer?.files;
+  if (files?.length) {
+    els.pdfFile.files = files;
+    loadSource(files);
   }
 }
 
@@ -1500,13 +1702,12 @@ function bindEvents() {
     persistStraighten();
   });
   els.pdfFile.addEventListener("change", () => {
-    const file = els.pdfFile.files?.[0];
-    if (file) {
-      loadPdfFile(file);
+    if (els.pdfFile.files?.length) {
+      loadSource(els.pdfFile.files);
     }
   });
   els.batchSize.addEventListener("change", () => {
-    if (state.running || !state.sourceBytes) {
+    if (state.running || !hasSource()) {
       return;
     }
     const hasWork = state.batches.some(

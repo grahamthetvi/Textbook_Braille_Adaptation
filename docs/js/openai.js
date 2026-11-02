@@ -60,10 +60,22 @@ export function describeOpenAIError(payload, status, options = {}) {
   return message || t("openai.requestFailed", { status });
 }
 
+function imageInputBlocks(images) {
+  return images.map((image) => {
+    const mime = image.mime || "image/jpeg";
+    return {
+      type: "input_image",
+      image_url: `data:${mime};base64,${bytesToBase64(image.bytes)}`,
+      detail: "high",
+    };
+  });
+}
+
 export function buildInput({
   startPage,
   endPage,
   pdfBytes,
+  images = [],
   ocrText = "",
   latexMath = false,
   clarifyHistory = [],
@@ -72,18 +84,29 @@ export function buildInput({
   headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
+  const promptOptions = {
+    latexMath,
+    locale,
+    emptyRetry,
+    headingContext,
+    imageCount: images.length,
+  };
   const userContent = ocrText
     ? [{ type: "input_text", text: buildOcrCleanupPrompt(pageRange, ocrText, { latexMath, locale, headingContext }) }]
     : [
-        {
-          type: "input_file",
-          filename: `pages-${pageRange}.pdf`,
-          file_data: `data:application/pdf;base64,${bytesToBase64(pdfBytes)}`,
-          detail: "high",
-        },
+        ...(images.length
+          ? imageInputBlocks(images)
+          : [
+              {
+                type: "input_file",
+                filename: `pages-${pageRange}.pdf`,
+                file_data: `data:application/pdf;base64,${bytesToBase64(pdfBytes)}`,
+                detail: "high",
+              },
+            ]),
         {
           type: "input_text",
-          text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }),
+          text: buildInterpretationPrompt(pageRange, promptOptions),
         },
       ];
   const input = [
@@ -117,6 +140,7 @@ export function buildRequestBody({
   startPage,
   endPage,
   pdfBytes,
+  images = [],
   ocrText = "",
   latexMath = false,
   clarifyHistory = [],
@@ -133,6 +157,7 @@ export function buildRequestBody({
       startPage,
       endPage,
       pdfBytes,
+      images,
       ocrText,
       latexMath,
       clarifyHistory,
@@ -150,6 +175,7 @@ export async function transcribeBatch({
   startPage,
   endPage,
   pdfBytes,
+  images = [],
   ocrText = "",
   signal,
   maxRetries = RETRYABLE_MAX_RETRIES,
@@ -168,6 +194,7 @@ export async function transcribeBatch({
     startPage,
     endPage,
     pdfBytes,
+    images,
     ocrText,
     latexMath,
     clarifyHistory,

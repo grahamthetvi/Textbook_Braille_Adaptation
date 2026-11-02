@@ -5,7 +5,7 @@ export const es = {
   "header.skip": "Saltar al contenido principal",
   "header.eyebrow": "Preparación accesible de libros de texto",
   "header.lede":
-    "Suelta un PDF de libro de texto escaneado, elige un modelo y descarga markdown accesible para lectores de pantalla. Las claves en la nube permanecen en esta sesión del navegador. Gemini puede ejecutarse desde esta página; Claude, OpenAI y Ollama necesitan el servidor adaptador local.",
+    "Suelta un PDF de libro de texto escaneado o un grupo de fotos de páginas, elige un modelo y descarga markdown accesible para lectores de pantalla. Las claves en la nube permanecen en esta sesión del navegador. Gemini puede ejecutarse desde esta página; Claude, OpenAI y Ollama necesitan el servidor adaptador local.",
 
   "toolbar.displayOptions": "Opciones de visualización",
   "toolbar.language": "Idioma",
@@ -106,10 +106,12 @@ export const es = {
   "form.ollama.modelList": "Modelo de visión de Ollama",
   "form.ollama.refresh": "Actualizar",
   "form.ollama.customTag": "Etiqueta personalizada de Ollama",
-  "form.pdfLegend": "PDF del libro de texto",
-  "form.dropLead": "Suelta aquí un PDF de libro de texto",
+  "form.pdfLegend": "Páginas del libro de texto",
+  "form.dropLead": "Suelta aquí un PDF de libro de texto o fotos de páginas",
   "form.dropOr": "o",
-  "form.pdfFile": "Archivo PDF",
+  "form.pdfFile": "PDF o fotos",
+  "form.dropHint":
+    "Cada foto es una página, en orden de nombre de archivo (page-001 antes de page-010). JPEG, PNG, WebP, GIF y BMP.",
   "form.noFile": "No hay ningún archivo cargado.",
   "form.planBatches": "Planificar lotes",
   "form.adaptBook": "Adaptar el libro",
@@ -134,6 +136,8 @@ export const es = {
   "blank.sourcePage": "Página de origen {page}",
   "blank.downloadPage": "Descargar página de origen {page}",
   "blank.downloadSuffix": " si quieres el PDF original.",
+  "blank.downloadPictureSuffix": " si quieres la foto original.",
+  "blank.picturesGone": "Las fotos originales ya no están disponibles en esta sesión.",
   "blank.couldNotDraw": "No se pudo dibujar esta página. Usa el enlace de descarga para inspeccionarla.",
   "blank.loading": "Cargando las páginas originales…",
   "blank.scanAria": "Escaneo original de la página de origen {page}",
@@ -145,13 +149,16 @@ export const es = {
   "progress.batchesCompleted": "Lotes completados",
   "progress.batchStatus": "Estado de los lotes",
 
-  "status.loadPdf": "Carga un PDF para planificar lotes. El modelo no se llama hasta que adaptes.",
+  "status.loadPdf":
+    "Carga un PDF o un grupo de fotos de páginas para planificar lotes. El modelo no se llama hasta que adaptes.",
   "status.raw": "{raw}",
   "status.plannedOne":
     "Se planificó 1 lote a partir de {count} páginas. El modelo no se llama hasta que adaptes.",
   "status.plannedMany":
     "Se planificaron {batches} lotes a partir de {count} páginas. El modelo no se llama hasta que adaptes.",
   "status.splitting": "Dividiendo el PDF en lotes…",
+  "status.readingPictures": "Leyendo foto {done} de {total}…",
+  "status.groupingPictures": "Agrupando las fotos en lotes…",
   "status.checkingOrientation": "Comprobando la orientación de las páginas {range}…",
   "status.straightened":
     "Lote {index} de {total}: páginas {range}. Se enderezaron {count} páginas que estaban de lado.",
@@ -230,10 +237,18 @@ export const es = {
 
   "file.onePage": "{fileName} · 1 página",
   "file.pages": "{fileName} · {count} páginas",
+  "file.onePicture": "{fileName} · 1 foto",
+  "file.pictures": "{count} fotos, en orden de nombre de archivo",
 
-  "alert.choosePdfFirst": "Elige un PDF primero y luego planifica los lotes.",
-  "alert.choosePdf": "Elige un archivo PDF.",
+  "alert.choosePdfFirst": "Elige un PDF o fotos primero y luego planifica los lotes.",
+  "alert.choosePdf": "Elige un PDF o un grupo de fotos.",
   "alert.notPdf": "Ese archivo no es un PDF. Elige un escaneo de libro de texto guardado como PDF.",
+  "alert.manyPdfs": "Elige un solo PDF. Para adaptar fotos, selecciona los archivos de imagen juntos.",
+  "alert.mixedSource": "Elige un PDF, o un grupo de fotos. No los mezcles.",
+  "alert.unsupportedFile":
+    "Esa selección no es un PDF ni un grupo de fotos. Usa un PDF, o archivos JPEG, PNG, WebP, GIF y BMP.",
+  "alert.noPictures": "Esas fotos no tienen páginas para adaptar.",
+  "alert.couldNotReadPicture": "No se pudo leer {fileName}. Guarda la foto como JPEG o PNG e inténtalo de nuevo.",
   "alert.noPages": "Este PDF no tiene páginas para adaptar.",
   "alert.couldNotRead": "No se pudo leer ese PDF. Prueba con otro archivo.",
   "alert.needKey":
@@ -242,7 +257,7 @@ export const es = {
   "alert.needOllamaModel": "Elige o introduce una etiqueta de modelo de visión de Ollama, como qwen2.5vl.",
   "alert.needLocalServer":
     "Claude, OpenAI y Ollama necesitan el adaptador local. Ejecuta python3 scripts/serve_adapter.py y abre esa dirección.",
-  "alert.needPdf": "Suelta o elige primero un PDF de libro de texto.",
+  "alert.needPdf": "Suelta o elige primero un PDF de libro de texto o fotos de páginas.",
   "alert.couldNotSplit": "No se pudo dividir ese PDF.",
   "alert.noClarify": "No hay ningún lote esperando una aclaración.",
   "alert.noBlankReview": "No hay ningún lote esperando una revisión de páginas en blanco.",

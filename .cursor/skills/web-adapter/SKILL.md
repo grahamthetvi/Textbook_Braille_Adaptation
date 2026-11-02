@@ -22,7 +22,7 @@ Optional Gemini-only proxy URL on the page: `http://127.0.0.1:8000/api/gemini`.
 1. Choose a model. Default is Gemini 3.8 Flash (`gemini-3.8-flash`). Other API ids: `gemini-3.1-pro-preview`, `claude-sonnet-5`, `claude-opus-5`, `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, or a local Ollama vision tag such as `qwen2.5vl`.
 2. Paste the matching API key (none for Ollama). Keys stay per provider in session storage. Do not type Cursor slugs; Model and Effort are separate.
 3. Leave Effort on the recommended value: Gemini/Claude medium, OpenAI low, Ollama off.
-4. Drop a textbook PDF.
+4. Drop a textbook PDF, or a group of page pictures (JPEG, PNG, WebP, GIF, or BMP). Pictures are read in filename order, one picture per page.
 5. Plan batches (5–8 pages). Leave **Straighten sideways scans** checked unless a page comes back turned the wrong way.
 6. Adapt book. Sideways pages are rotated upright before the model sees them.
 7. If the model returns no text, compare the original pages. Skip only when every page in the batch is blank. If any page has text, retry. A sideways preview means straightening should stay on.

@@ -360,3 +360,74 @@ export async function extractBatchOcrText(pdfBytes, options = {}) {
 
   throw new Error(t("ocr.noTextExtracted", { range: pageRange }));
 }
+
+async function imageBytesToCanvas(bytes, mime) {
+  const blob = new Blob([bytes], { type: mime || "image/jpeg" });
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(blob, { imageOrientation: "from-image" });
+  } catch {
+    bitmap = await createImageBitmap(blob);
+  }
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Could not draw the picture.");
+    }
+    context.drawImage(bitmap, 0, 0);
+    return canvas;
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+/** Tesseract fallback when the source is pictures rather than a PDF. */
+export async function extractImageBatchOcrText(imagePages, options = {}) {
+  const pagesIn = imagePages || [];
+  const startPage = options.startPage || 1;
+  const endPage = options.endPage || startPage + Math.max(pagesIn.length, 1) - 1;
+  const pageRange = formatPageRange(startPage, endPage);
+  const onProgress = options.onProgress || null;
+  const tess = options.tesseractLib || globalThis.Tesseract;
+  const canRecognize = typeof tess?.createWorker === "function" || typeof tess?.recognize === "function";
+  if (!canRecognize) {
+    throw new Error(t("ocr.noTextExtracted", { range: pageRange }));
+  }
+
+  const pages = [];
+  let totalChars = 0;
+  const session = await openTesseractSession(tess, options.lang || "eng", String(OCR_TARGET_DPI));
+  try {
+    for (let index = 0; index < pagesIn.length; index += 1) {
+      const absolutePage = startPage + index;
+      if (onProgress) {
+        onProgress("status.ocrExtractingPage", { page: absolutePage, range: pageRange });
+      }
+      const image = pagesIn[index];
+      const canvas = await imageBytesToCanvas(image.bytes, image.mime);
+      const result = await session.recognize(canvas);
+      const pageText = String(result?.data?.text || "").trim();
+      totalChars += pageText.replace(/\s+/g, "").length;
+      pages.push({ pageNumber: index + 1, text: pageText });
+    }
+  } finally {
+    await session.terminate();
+  }
+
+  if (totalChars <= 0) {
+    throw new Error(t("ocr.noTextExtracted", { range: pageRange }));
+  }
+
+  const formatted = pages
+    .map((page) => `=== Page ${startPage + page.pageNumber - 1} ===\n${page.text}`)
+    .join("\n\n");
+  return {
+    text: formatted,
+    method: totalChars >= 30 ? "raster-ocr" : "raster-ocr-sparse",
+    pageCount: pages.length,
+    totalChars,
+  };
+}
