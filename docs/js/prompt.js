@@ -150,6 +150,10 @@ export function buildInterpretationPrompt(pageRange, options = {}) {
     : "";
   const headingContext = String(options.headingContext || "").trim();
   const headingBlock = headingContext ? `\n${headingContext}\n` : "";
+  const imageNote =
+    Number(options.imageCount) > 0
+      ? " Each attached picture is one of these pages, in order."
+      : "";
   return `Produce screen-reader-accessible text from these scanned textbook pages. Do not output braille, contractions, or braille ASCII.
 
 Follow the system instruction. Transcribe faithfully. If you cannot reliably make the content accessible, end with a ${lang.clarifyMarker} block. Prefer a ${lang.clarifyMarker}-only reply. Nested lists are allowed. Number or letter questions when they sit under a numbered item. Use paragraphs, bullet lists, numbered lists, tables, headings, and blank lines. Avoid square brackets, braces, asterisk, and number-sign unless they appear in the source. Do not use markdown hash headings. Preserve italic, bold, and underlined print as _italics_, __bold__, and <u>underlined</u>. Use ${lang.unclearToken} for unreadable words. Strip running headers, footers, and lone page numbers. Rejoin line-break hyphens. Read columns in order.
@@ -157,7 +161,7 @@ After a complete transcription, append a HEADINGS trailer listing level|title fo
 ${languageBlock}${mathLine}${headingBlock}
 Output markdown or plain text only when completing the batch. No preamble, no code fences.
 If one page in this batch has no printed marks, skip that page and transcribe the others. Do not return an empty reply for the batch.
-Source pages in this batch: ${pageRange}.${emptyRetry}`;
+Source pages in this batch: ${pageRange}.${imageNote}${emptyRetry}`;
 }
 
 /** Split a model reply into an optional draft and a trailing clarify question. */

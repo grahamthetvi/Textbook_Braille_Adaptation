@@ -5,7 +5,7 @@ export const en = {
   "header.skip": "Skip to main content",
   "header.eyebrow": "Accessible textbook prep",
   "header.lede":
-    "Drop a scanned textbook PDF, choose a model, and download screen-reader-accessible markdown. Cloud keys stay in this browser session. Gemini can run from this page; Claude, OpenAI, and Ollama need the local adapter server.",
+    "Drop a scanned textbook PDF or a group of page pictures, choose a model, and download screen-reader-accessible markdown. Cloud keys stay in this browser session. Gemini can run from this page; Claude, OpenAI, and Ollama need the local adapter server.",
 
   "toolbar.displayOptions": "Display options",
   "toolbar.language": "Language",
@@ -106,10 +106,12 @@ export const en = {
   "form.ollama.modelList": "Ollama vision model",
   "form.ollama.refresh": "Refresh",
   "form.ollama.customTag": "Custom Ollama tag",
-  "form.pdfLegend": "Textbook PDF",
-  "form.dropLead": "Drop a textbook PDF here",
+  "form.pdfLegend": "Textbook pages",
+  "form.dropLead": "Drop a textbook PDF or page pictures",
   "form.dropOr": "or",
-  "form.pdfFile": "PDF file",
+  "form.pdfFile": "PDF or pictures",
+  "form.dropHint":
+    "Pictures are one page each, in filename order (page-001 before page-010). JPEG, PNG, WebP, GIF, and BMP.",
   "form.noFile": "No file loaded.",
   "form.planBatches": "Plan batches",
   "form.adaptBook": "Adapt book",
@@ -134,6 +136,8 @@ export const en = {
   "blank.sourcePage": "Source page {page}",
   "blank.downloadPage": "Download source page {page}",
   "blank.downloadSuffix": " if you want the original PDF.",
+  "blank.downloadPictureSuffix": " if you want the original picture.",
+  "blank.picturesGone": "The original pictures are no longer available in this session.",
   "blank.couldNotDraw": "Could not draw this page. Use the download link to inspect it.",
   "blank.loading": "Loading original pages…",
   "blank.scanAria": "Original scan of source page {page}",
@@ -145,13 +149,16 @@ export const en = {
   "progress.batchesCompleted": "Batches completed",
   "progress.batchStatus": "Batch status",
 
-  "status.loadPdf": "Load a PDF to plan batches. The model is not called until you adapt.",
+  "status.loadPdf":
+    "Load a PDF or a group of page pictures to plan batches. The model is not called until you adapt.",
   "status.raw": "{raw}",
   "status.plannedOne":
     "Planned 1 batch from {count} pages. The model is not called until you adapt.",
   "status.plannedMany":
     "Planned {batches} batches from {count} pages. The model is not called until you adapt.",
   "status.splitting": "Splitting the PDF into batches…",
+  "status.readingPictures": "Reading picture {done} of {total}…",
+  "status.groupingPictures": "Grouping pictures into batches…",
   "status.checkingOrientation": "Checking which way pages {range} are turned…",
   "status.straightened":
     "Batch {index} of {total}: pages {range}. Turned {count} sideways pages upright.",
@@ -229,10 +236,18 @@ export const en = {
 
   "file.onePage": "{fileName} · 1 page",
   "file.pages": "{fileName} · {count} pages",
+  "file.onePicture": "{fileName} · 1 picture",
+  "file.pictures": "{count} pictures, in filename order",
 
-  "alert.choosePdfFirst": "Choose a PDF first, then plan batches.",
-  "alert.choosePdf": "Choose a PDF file.",
+  "alert.choosePdfFirst": "Choose a PDF or pictures first, then plan batches.",
+  "alert.choosePdf": "Choose a PDF or a group of pictures.",
   "alert.notPdf": "That file is not a PDF. Choose a textbook scan saved as PDF.",
+  "alert.manyPdfs": "Choose one PDF. To adapt pictures, select the image files together.",
+  "alert.mixedSource": "Choose one PDF, or a group of pictures. Do not mix them.",
+  "alert.unsupportedFile":
+    "That selection is not a PDF or a group of pictures. Use a PDF, or JPEG, PNG, WebP, GIF, and BMP files.",
+  "alert.noPictures": "Those pictures have no pages to adapt.",
+  "alert.couldNotReadPicture": "Could not read {fileName}. Save the picture as JPEG or PNG and try again.",
   "alert.noPages": "This PDF has no pages to adapt.",
   "alert.couldNotRead": "Could not read that PDF. Try a different file.",
   "alert.needKey":
@@ -241,7 +256,7 @@ export const en = {
   "alert.needOllamaModel": "Choose or enter an Ollama vision model tag, such as qwen2.5vl.",
   "alert.needLocalServer":
     "Claude, OpenAI, and Ollama need the local adapter. Run python3 scripts/serve_adapter.py and open that address.",
-  "alert.needPdf": "Drop or choose a textbook PDF first.",
+  "alert.needPdf": "Drop or choose a textbook PDF or page pictures first.",
   "alert.couldNotSplit": "Could not split that PDF.",
   "alert.noClarify": "There is no batch waiting for clarification.",
   "alert.noBlankReview": "There is no batch waiting for a blank-page review.",

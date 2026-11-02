@@ -57,7 +57,7 @@
       <p class="eyebrow" data-i18n="header.eyebrow">Accessible textbook prep</p>
       <h1 data-i18n="header.title">Textbook Adapter</h1>
       <p class="lede" data-i18n="header.lede">
-        Drop a scanned textbook PDF, choose a model, and download
+        Drop a scanned textbook PDF or a group of page pictures, choose a model, and download
         screen-reader-accessible markdown. Cloud keys stay in this browser session.
         Gemini can run from this page; Claude, OpenAI, and Ollama need the local
         adapter server.
@@ -242,14 +242,23 @@
         </details>
 
         <fieldset class="panel">
-          <legend data-i18n="form.pdfLegend">Textbook PDF</legend>
+          <legend data-i18n="form.pdfLegend">Textbook pages</legend>
           <div id="drop-zone" class="drop-zone">
-            <p class="drop-lead" data-i18n="form.dropLead">Drop a textbook PDF here</p>
+            <p class="drop-lead" data-i18n="form.dropLead">Drop a textbook PDF or page pictures</p>
             <p class="drop-or" data-i18n="form.dropOr">or</p>
             <label class="file-picker" for="pdf-file">
-              <span class="file-picker-label" data-i18n="form.pdfFile">PDF file</span>
-              <input id="pdf-file" name="pdf-file" type="file" accept="application/pdf" />
+              <span class="file-picker-label" data-i18n="form.pdfFile">PDF or pictures</span>
+              <input
+                id="pdf-file"
+                name="pdf-file"
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/bmp,.jpg,.jpeg,.png,.webp,.gif,.bmp,.heic,.heif,.tif,.tiff"
+                multiple
+              />
             </label>
+            <p class="hint" data-i18n="form.dropHint">
+              Pictures are one page each, in filename order (page-001 before page-010). JPEG, PNG, WebP, GIF, and BMP.
+            </p>
             <p id="file-meta" class="file-meta">No file loaded.</p>
           </div>
         </fieldset>

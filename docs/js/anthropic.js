@@ -50,10 +50,22 @@ export function describeAnthropicError(payload, status, options = {}) {
   return message || t("anthropic.requestFailed", { status });
 }
 
+function imageContentBlocks(images) {
+  return images.map((image) => ({
+    type: "image",
+    source: {
+      type: "base64",
+      media_type: image.mime || "image/jpeg",
+      data: bytesToBase64(image.bytes),
+    },
+  }));
+}
+
 export function buildMessages({
   startPage,
   endPage,
   pdfBytes,
+  images = [],
   ocrText = "",
   latexMath = false,
   clarifyHistory = [],
@@ -62,18 +74,29 @@ export function buildMessages({
   headingContext = "",
 }) {
   const pageRange = pageRangeLabel(startPage, endPage);
+  const promptOptions = {
+    latexMath,
+    locale,
+    emptyRetry,
+    headingContext,
+    imageCount: images.length,
+  };
   const userContent = ocrText
     ? [{ type: "text", text: buildOcrCleanupPrompt(pageRange, ocrText, { latexMath, locale, headingContext }) }]
     : [
-        {
-          type: "document",
-          source: {
-            type: "base64",
-            media_type: "application/pdf",
-            data: bytesToBase64(pdfBytes),
-          },
-        },
-        { type: "text", text: buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext }) },
+        ...(images.length
+          ? imageContentBlocks(images)
+          : [
+              {
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: bytesToBase64(pdfBytes),
+                },
+              },
+            ]),
+        { type: "text", text: buildInterpretationPrompt(pageRange, promptOptions) },
       ];
   const messages = [
     {
@@ -101,6 +124,7 @@ export function buildRequestBody({
   startPage,
   endPage,
   pdfBytes,
+  images = [],
   ocrText = "",
   latexMath = false,
   clarifyHistory = [],
@@ -117,6 +141,7 @@ export function buildRequestBody({
       startPage,
       endPage,
       pdfBytes,
+      images,
       ocrText,
       latexMath,
       clarifyHistory,
@@ -134,6 +159,7 @@ export async function transcribeBatch({
   startPage,
   endPage,
   pdfBytes,
+  images = [],
   ocrText = "",
   signal,
   maxRetries = RETRYABLE_MAX_RETRIES,
@@ -152,6 +178,7 @@ export async function transcribeBatch({
     startPage,
     endPage,
     pdfBytes,
+    images,
     ocrText,
     latexMath,
     clarifyHistory,

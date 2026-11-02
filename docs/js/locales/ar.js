@@ -5,7 +5,7 @@ export const ar = {
   "header.skip": "تخطي إلى المحتوى الرئيسي",
   "header.eyebrow": "إعداد كتب دراسية ميسّرة",
   "header.lede":
-    "أسقط ملف PDF ممسوحًا لكتاب دراسي، واختر نموذجًا، ثم نزّل ماركداون ميسّرًا لقارئات الشاشة. تبقى مفاتيح السحابة في جلسة هذا المتصفح. يمكن تشغيل Gemini من هذه الصفحة؛ يحتاج Claude وOpenAI وOllama إلى خادم المحوّل المحلي.",
+    "أسقط ملف PDF ممسوحًا لكتاب دراسي أو مجموعة صور للصفحات، واختر نموذجًا، ثم نزّل ماركداون ميسّرًا لقارئات الشاشة. تبقى مفاتيح السحابة في جلسة هذا المتصفح. يمكن تشغيل Gemini من هذه الصفحة؛ يحتاج Claude وOpenAI وOllama إلى خادم المحوّل المحلي.",
 
   "toolbar.displayOptions": "خيارات العرض",
   "toolbar.language": "اللغة",
@@ -106,10 +106,12 @@ export const ar = {
   "form.ollama.modelList": "نموذج رؤية Ollama",
   "form.ollama.refresh": "تحديث",
   "form.ollama.customTag": "وسم Ollama مخصص",
-  "form.pdfLegend": "ملف PDF للكتاب الدراسي",
-  "form.dropLead": "أسقط ملف PDF لكتاب دراسي هنا",
+  "form.pdfLegend": "صفحات الكتاب الدراسي",
+  "form.dropLead": "أسقط ملف PDF لكتاب دراسي أو صور الصفحات هنا",
   "form.dropOr": "أو",
-  "form.pdfFile": "ملف PDF",
+  "form.pdfFile": "PDF أو صور",
+  "form.dropHint":
+    "كل صورة صفحة واحدة، بترتيب اسم الملف (page-001 قبل page-010). JPEG وPNG وWebP وGIF وBMP.",
   "form.noFile": "لم يُحمَّل أي ملف.",
   "form.planBatches": "تخطيط الدفعات",
   "form.adaptBook": "تكييف الكتاب",
@@ -134,6 +136,8 @@ export const ar = {
   "blank.sourcePage": "صفحة المصدر {page}",
   "blank.downloadPage": "تنزيل صفحة المصدر {page}",
   "blank.downloadSuffix": " إذا أردت ملف PDF الأصلي.",
+  "blank.downloadPictureSuffix": " إذا أردت الصورة الأصلية.",
+  "blank.picturesGone": "الصور الأصلية لم تعد متاحة في هذه الجلسة.",
   "blank.couldNotDraw": "تعذّر رسم هذه الصفحة. استخدم رابط التنزيل لفحصها.",
   "blank.loading": "جارٍ تحميل الصفحات الأصلية…",
   "blank.scanAria": "المسح الأصلي لصفحة المصدر {page}",
@@ -145,13 +149,16 @@ export const ar = {
   "progress.batchesCompleted": "الدفعات المكتملة",
   "progress.batchStatus": "حالة الدفعات",
 
-  "status.loadPdf": "حمّل ملف PDF لتخطيط الدفعات. لا يُستدعى النموذج حتى تبدأ التكييف.",
+  "status.loadPdf":
+    "حمّل ملف PDF أو مجموعة صور للصفحات لتخطيط الدفعات. لا يُستدعى النموذج حتى تبدأ التكييف.",
   "status.raw": "{raw}",
   "status.plannedOne":
     "تم تخطيط دفعة واحدة من {count} صفحات. لا يُستدعى النموذج حتى تبدأ التكييف.",
   "status.plannedMany":
     "تم تخطيط {batches} دفعات من {count} صفحات. لا يُستدعى النموذج حتى تبدأ التكييف.",
   "status.splitting": "جارٍ تقسيم ملف PDF إلى دفعات…",
+  "status.readingPictures": "جارٍ قراءة الصورة {done} من {total}…",
+  "status.groupingPictures": "جارٍ تجميع الصور في دفعات…",
   "status.checkingOrientation": "جارٍ التحقق من اتجاه الصفحات {range}…",
   "status.straightened":
     "الدفعة {index} من {total}: الصفحات {range}. تم تقويم {count} صفحات كانت مقلوبة جانبًا.",
@@ -228,10 +235,18 @@ export const ar = {
 
   "file.onePage": "{fileName} · صفحة واحدة",
   "file.pages": "{fileName} · {count} صفحات",
+  "file.onePicture": "{fileName} · صورة واحدة",
+  "file.pictures": "{count} صور، بترتيب اسم الملف",
 
-  "alert.choosePdfFirst": "اختر ملف PDF أولًا، ثم خطط الدفعات.",
-  "alert.choosePdf": "اختر ملف PDF.",
+  "alert.choosePdfFirst": "اختر ملف PDF أو صورًا أولًا، ثم خطط الدفعات.",
+  "alert.choosePdf": "اختر ملف PDF أو مجموعة صور.",
   "alert.notPdf": "هذا الملف ليس PDF. اختر مسحًا لكتاب دراسي محفوظًا كـ PDF.",
+  "alert.manyPdfs": "اختر ملف PDF واحدًا. لتكييف الصور، حدد ملفات الصور معًا.",
+  "alert.mixedSource": "اختر ملف PDF واحدًا، أو مجموعة صور. لا تخلط بينهما.",
+  "alert.unsupportedFile":
+    "هذا الاختيار ليس ملف PDF ولا مجموعة صور. استخدم PDF، أو ملفات JPEG وPNG وWebP وGIF وBMP.",
+  "alert.noPictures": "لا تحتوي هذه الصور على صفحات للتكييف.",
+  "alert.couldNotReadPicture": "تعذّر قراءة {fileName}. احفظ الصورة بصيغة JPEG أو PNG وحاول مرة أخرى.",
   "alert.noPages": "لا يحتوي ملف PDF هذا على صفحات للتكييف.",
   "alert.couldNotRead": "تعذّر قراءة ملف PDF هذا. جرّب ملفًا آخر.",
   "alert.needKey":
@@ -240,7 +255,7 @@ export const ar = {
   "alert.needOllamaModel": "اختر أو أدخل وسم نموذج رؤية لـ Ollama، مثل qwen2.5vl.",
   "alert.needLocalServer":
     "يحتاج Claude وOpenAI وOllama إلى المحوّل المحلي. شغّل python3 scripts/serve_adapter.py وافتح ذلك العنوان.",
-  "alert.needPdf": "أسقط أو اختر ملف PDF لكتاب دراسي أولًا.",
+  "alert.needPdf": "أسقط أو اختر ملف PDF لكتاب دراسي أو صور الصفحات أولًا.",
   "alert.couldNotSplit": "تعذّر تقسيم ملف PDF هذا.",
   "alert.noClarify": "لا توجد دفعة تنتظر توضيحًا.",
   "alert.noBlankReview": "لا توجد دفعة تنتظر مراجعة صفحات فارغة.",

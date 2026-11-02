@@ -537,7 +537,8 @@ progress {
   font-weight: 600;
 }
 
-.blank-page canvas {
+.blank-page canvas,
+.blank-page img {
   display: block;
   width: 100%;
   height: auto;

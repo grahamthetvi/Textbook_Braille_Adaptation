@@ -2,6 +2,7 @@
 
 import { t } from "./i18n.js";
 import {
+  bytesToBase64,
   isMissingLocalProxy,
   requestError,
   RETRYABLE_MAX_RETRIES,
@@ -69,7 +70,13 @@ export function buildChatMessages({
   const pageRange = pageRangeLabel(startPage, endPage);
   const userContent = ocrText
     ? buildOcrCleanupPrompt(pageRange, ocrText, { latexMath, locale, headingContext })
-    : buildInterpretationPrompt(pageRange, { latexMath, locale, emptyRetry, headingContext });
+    : buildInterpretationPrompt(pageRange, {
+        latexMath,
+        locale,
+        emptyRetry,
+        headingContext,
+        imageCount: images.length,
+      });
   const userMessage = {
     role: "user",
     content: userContent,
@@ -208,6 +215,7 @@ export async function transcribeBatch({
   startPage,
   endPage,
   pdfBytes,
+  images: pageImages = [],
   ocrText = "",
   signal,
   maxRetries = RETRYABLE_MAX_RETRIES,
@@ -243,7 +251,9 @@ export async function transcribeBatch({
     });
   }
 
-  const images = await rasterizePages(pdfBytes, { scale: 2 });
+  const images = pageImages.length
+    ? pageImages.map((image) => bytesToBase64(image.bytes))
+    : await rasterizePages(pdfBytes, { scale: 2 });
   if (!images.length) {
     throw requestError(t("ollama.noPages"));
   }
